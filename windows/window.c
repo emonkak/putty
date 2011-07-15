@@ -1945,8 +1945,9 @@ static void another_font(int fontno)
 {
     int basefont;
     int fw_dontcare, fw_bold;
-    int c, u, w, x;
+    int c, u, w, x, y;
     char *s;
+    HDC hdc;
 
     if (fontno < 0 || fontno >= FONT_MAXNO || fontflag[fontno])
 	return;
@@ -1963,16 +1964,21 @@ static void another_font(int fontno)
 	fw_bold = FW_BOLD;
     }
 
+    hdc = GetDC(hwnd);
     c = cfg.font.charset;
     w = fw_dontcare;
     u = FALSE;
     s = cfg.font.name;
-    x = font_width;
+    x = 0;
+    y = cfg.font.height;
+    if (y > 0)
+	y = -MulDiv(y, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+    ReleaseDC(hwnd, hdc);
 
     if (fontno & FONT_WIDE)
-	x *= 2;
+	x = font_width * 2;
     if (fontno & FONT_NARROW)
-	x = (x+1)/2;
+	x = (font_width + 1) / 2;
     if (fontno & FONT_OEM)
 	c = OEM_CHARSET;
     if (fontno & FONT_BOLD)
@@ -1981,7 +1987,7 @@ static void another_font(int fontno)
 	u = TRUE;
 
     fonts[fontno] =
-	CreateFont(font_height * (1 + !!(fontno & FONT_HIGH)), x, 0, 0, w,
+	CreateFont(y * (1 + !!(fontno & FONT_HIGH)), x, 0, 0, w,
 		   FALSE, u, FALSE, c, OUT_DEFAULT_PRECIS,
 		   CLIP_DEFAULT_PRECIS, FONT_QUALITY(cfg.font_quality),
 		   DEFAULT_PITCH | FF_DONTCARE, s);

@@ -4039,9 +4039,8 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     opaque = FALSE;
     else
     opaque = TRUE;                     /* start by erasing the rectangle */
-    /* < */
-    for (remaining = len; remaining > 0;
-         text += len, remaining -= len, x += char_width * len) {
+    remaining = len;
+    while (1) {
         len = (maxlen < remaining ? maxlen : remaining);
 
         if (len > lpDx_len) {
@@ -4176,12 +4175,19 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
             }
         }
 
+        remaining -= len;
+        if (remaining <= 0)
+            break;
+
         /*
          * If we're looping round again, stop erasing the background
          * rectangle.
          */
         SetBkMode(hdc, TRANSPARENT);
         opaque = FALSE;
+
+        text += len;
+        x += char_width * len;
     }
     if (lattr != LATTR_TOP && (force_manual_underline ||
 			       (und_mode == UND_LINE

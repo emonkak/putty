@@ -1811,6 +1811,12 @@ static void init_fonts(int pick_width, int pick_height)
 
     f(FONT_NORMAL, cfg.font.charset, fw_dontcare, FALSE);
 
+    f(FONT_UNDERLINE, cfg.font.charset, fw_dontcare, TRUE);
+
+    if (bold_mode == BOLD_FONT) {
+        f(FONT_BOLD, cfg.font.charset, fw_bold, FALSE);
+    }
+
     SelectObject(hdc, fonts[FONT_NORMAL]);
     GetTextMetrics(hdc, &tm);
 
@@ -1851,8 +1857,6 @@ static void init_fonts(int pick_width, int pick_height)
 	GetCPInfo(ucsdata.font_codepage, &cpinfo);
 	ucsdata.dbcs_screenfont = (cpinfo.MaxCharSize > 1);
     }
-
-    f(FONT_UNDERLINE, cfg.font.charset, fw_dontcare, TRUE);
 
     /*
      * Some fonts, e.g. 9-pt Courier, draw their underlines
@@ -1902,9 +1906,6 @@ static void init_fonts(int pick_width, int pick_height)
 	}
     }
 
-    if (bold_mode == BOLD_FONT) {
-	f(FONT_BOLD, cfg.font.charset, fw_bold, FALSE);
-    }
 #undef f
 
     descent = tm.tmAscent + 1;
@@ -3883,8 +3884,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 
     if ((attr & TATTR_ACTCURS) && (cfg.cursor_type == 0 || term->big_cursor)) {
 	attr &= ~(ATTR_REVERSE|ATTR_BLINK|ATTR_COLOURS);
-	if (bold_mode == BOLD_COLOURS)
-	    attr &= ~ATTR_BOLD;
+	attr &= ~ATTR_BOLD;
 
 	/* cursor fg and bg */
 	if (ime_mode)
@@ -3949,7 +3949,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
 
     nfg = ((attr & ATTR_FGMASK) >> ATTR_FGSHIFT);
     nbg = ((attr & ATTR_BGMASK) >> ATTR_BGSHIFT);
-    if (bold_mode == BOLD_FONT && (attr & ATTR_BOLD))
+    if (attr & ATTR_BOLD)
 	nfont |= FONT_BOLD;
     if (und_mode == UND_FONT && (attr & ATTR_UNDER))
 	nfont |= FONT_UNDERLINE;
@@ -3964,18 +3964,18 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     another_font(nfont);
     if (!fonts[nfont])
 	nfont = FONT_NORMAL;
+    if (attr & ATTR_BOLD) {
+	if (nfg < 16) nfg |= 8;
+	else if (nfg >= 256) nfg |= 1;
+    }
+    if (attr & ATTR_BLINK) {
+	if (nbg < 16) nbg |= 8;
+	else if (nbg >= 256) nbg |= 1;
+    }
     if (attr & ATTR_REVERSE) {
 	t = nfg;
 	nfg = nbg;
 	nbg = t;
-    }
-    if (bold_mode == BOLD_COLOURS && (attr & ATTR_BOLD)) {
-	if (nfg < 16) nfg |= 8;
-	else if (nfg >= 256) nfg |= 1;
-    }
-    if (bold_mode == BOLD_COLOURS && (attr & ATTR_BLINK)) {
-	if (nbg < 16) nbg |= 8;
-	else if (nbg >= 256) nbg |= 1;
     }
     fg = colours[nfg];
     bg = colours[nbg];
@@ -5417,13 +5417,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 		fgcolour = ((attr[i] & ATTR_FGMASK) >> ATTR_FGSHIFT);
 		bgcolour = ((attr[i] & ATTR_BGMASK) >> ATTR_BGSHIFT);
 
-		if (attr[i] & ATTR_REVERSE) {
-		    int tmpcolour = fgcolour;	/* Swap foreground and background */
-		    fgcolour = bgcolour;
-		    bgcolour = tmpcolour;
-		}
-
-		if (bold_mode == BOLD_COLOURS && (attr[i] & ATTR_BOLD)) {
+		if (attr[i] & ATTR_BOLD) {
 		    if (fgcolour  <   8)	/* ANSI colours */
 			fgcolour +=   8;
 		    else if (fgcolour >= 256)	/* Default colours */
@@ -5435,6 +5429,12 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 			bgcolour +=   8;
     		    else if (bgcolour >= 256)	/* Default colours */
 			bgcolour ++;
+		}
+
+		if (attr[i] & ATTR_REVERSE) {
+		    int tmpcolour = fgcolour;	/* Swap foreground and background */
+		    fgcolour = bgcolour;
+		    bgcolour = tmpcolour;
 		}
 
 		palette[fgcolour]++;
@@ -5514,7 +5514,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 		    bgcolour = tmpcolour;
 		}
 
-		if (bold_mode == BOLD_COLOURS && (attr[tindex] & ATTR_BOLD)) {
+		if (attr[tindex] & ATTR_BOLD) {
 		    if (fgcolour  <   8)	    /* ANSI colours */
 			fgcolour +=   8;
 		    else if (fgcolour >= 256)	    /* Default colours */
@@ -5531,10 +5531,7 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
                 /*
                  * Collect other attributes
                  */
-		if (bold_mode != BOLD_COLOURS)
-		    attrBold  = attr[tindex] & ATTR_BOLD;
-		else
-		    attrBold  = 0;
+		attrBold  = 0;
                 
 		attrUnder = attr[tindex] & ATTR_UNDER;
 
@@ -5550,11 +5547,17 @@ void write_clip(void *frontend, wchar_t * data, int *attr, int len, int must_des
 			bgcolour  = -1;		    /* No coloring */
 
 		    if (fgcolour >= 256) {	    /* Default colour */
-			if (bold_mode == BOLD_COLOURS && (fgcolour & 1) && bgcolour == -1)
+			if ((fgcolour & 1) && bgcolour == -1)
 			    attrBold = ATTR_BOLD;   /* Emphasize text with bold attribute */
 
 			fgcolour  = -1;		    /* No coloring */
 		    }
+		}
+
+		if (attr[tindex] & ATTR_REVERSE) {
+		    int tmpcolour = fgcolour;	    /* Swap foreground and background */
+		    fgcolour = bgcolour;
+		    bgcolour = tmpcolour;
 		}
 
                 /*

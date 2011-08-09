@@ -271,8 +271,7 @@ int read_setting_i(void *handle, const char *key, int defvalue)
 	if (handle) {
 	    char buffer[32];
 	    GetPrivateProfileString((char*) handle, key, "", buffer, sizeof (buffer), inifile);
-	    if ('0' <= buffer[0] && buffer[0] <= '9')
-		return atoi(buffer);
+	    return atoi(buffer);
 	}
 	return defvalue;
     }

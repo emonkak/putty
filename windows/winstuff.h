@@ -16,18 +16,16 @@
 #include "winhelp.h"
 
 struct Filename {
-    char *path;
+    char path[FILENAME_MAX];
 };
-#define f_open(filename, mode, isprivate) ( fopen((filename)->path, (mode)) )
+#define f_open(filename, mode, isprivate) ( fopen((filename).path, (mode)) )
 
 struct FontSpec {
-    char *name;
+    char name[64];
     int isbold;
     int height;
     int charset;
 };
-struct FontSpec *fontspec_new(const char *name,
-                               int bold, int height, int charset);
 
 #ifndef CLEARTYPE_QUALITY
 #define CLEARTYPE_QUALITY 5
@@ -117,7 +115,7 @@ struct FontSpec *fontspec_new(const char *name,
 
 #ifndef DONE_TYPEDEFS
 #define DONE_TYPEDEFS
-typedef struct conf_tag Conf;
+typedef struct config_tag Config;
 typedef struct backend_tag Backend;
 typedef struct terminal_tag Terminal;
 #endif
@@ -287,7 +285,6 @@ BOOL request_file(filereq *state, OPENFILENAME *of, int preserve, int save);
 filereq *filereq_new(void);
 void filereq_free(filereq *state);
 int message_box(LPCTSTR text, LPCTSTR caption, DWORD style, DWORD helpctxid);
-char *GetDlgItemText_alloc(HWND hwnd, int id);
 void split_into_argv(char *, int *, char ***, char ***);
 
 /*
@@ -476,7 +473,7 @@ void EnableSizeTip(int bEnable);
  * Exports from unicode.c.
  */
 struct unicode_data;
-void init_ucs(Conf *, struct unicode_data *);
+void init_ucs(Config *, struct unicode_data *);
 
 /*
  * Exports from winhandl.c.
@@ -492,7 +489,6 @@ struct handle *handle_input_new(HANDLE handle, handle_inputfn_t gotdata,
 struct handle *handle_output_new(HANDLE handle, handle_outputfn_t sentdata,
 				 void *privdata, int flags);
 int handle_write(struct handle *h, const void *data, int len);
-void handle_write_eof(struct handle *h);
 HANDLE *handle_get_events(int *nevents);
 void handle_free(struct handle *h);
 void handle_got_event(HANDLE event);

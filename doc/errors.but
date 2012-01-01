@@ -1,4 +1,4 @@
-\define{versioniderrors} \versionid $Id$
+\define{versioniderrors} \versionid $Id: errors.but 8897 2010-03-13 14:47:14Z jacob $
 
 \C{errors} Common \i{error messages}
 

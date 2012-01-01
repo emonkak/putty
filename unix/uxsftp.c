@@ -34,7 +34,7 @@ char *x_get_default(const char *key)
     return NULL;		       /* this is a stub */
 }
 
-void platform_get_x11_auth(struct X11Display *display, Conf *conf)
+void platform_get_x11_auth(struct X11Display *display, const Config *cfg)
 {
     /* Do nothing, therefore no auth. */
 }
@@ -53,17 +53,21 @@ int platform_default_i(const char *name, int def)
     return def;
 }
 
-FontSpec *platform_default_fontspec(const char *name)
+FontSpec platform_default_fontspec(const char *name)
 {
-    return fontspec_new("");
+    FontSpec ret;
+    *ret.name = '\0';
+    return ret;
 }
 
-Filename *platform_default_filename(const char *name)
+Filename platform_default_filename(const char *name)
 {
+    Filename ret;
     if (!strcmp(name, "LogFileName"))
-	return filename_from_str("putty.log");
+	strcpy(ret.path, "putty.log");
     else
-	return filename_from_str("");
+	*ret.path = '\0';
+    return ret;
 }
 
 char *get_ttymode(void *frontend, const char *mode) { return NULL; }
@@ -121,8 +125,7 @@ struct RFile {
 };
 
 RFile *open_existing_file(char *name, uint64 *size,
-			  unsigned long *mtime, unsigned long *atime,
-                          long *perms)
+			  unsigned long *mtime, unsigned long *atime)
 {
     int fd;
     RFile *ret;
@@ -134,7 +137,7 @@ RFile *open_existing_file(char *name, uint64 *size,
     ret = snew(RFile);
     ret->fd = fd;
 
-    if (size || mtime || atime || perms) {
+    if (size || mtime || atime) {
 	struct stat statbuf;
 	if (fstat(fd, &statbuf) < 0) {
 	    fprintf(stderr, "%s: stat: %s\n", name, strerror(errno));
@@ -150,9 +153,6 @@ RFile *open_existing_file(char *name, uint64 *size,
 
 	if (atime)
 	    *atime = statbuf.st_atime;
-
-	if (perms)
-	    *perms = statbuf.st_mode;
     }
 
     return ret;
@@ -174,13 +174,12 @@ struct WFile {
     char *name;
 };
 
-WFile *open_new_file(char *name, long perms)
+WFile *open_new_file(char *name)
 {
     int fd;
     WFile *ret;
 
-    fd = open(name, O_CREAT | O_TRUNC | O_WRONLY,
-              (mode_t)(perms ? perms : 0666));
+    fd = open(name, O_CREAT | O_TRUNC | O_WRONLY, 0666);
     if (fd < 0)
 	return NULL;
 
@@ -604,8 +603,6 @@ char *ssh_sftp_get_cmdline(char *prompt, int no_fds_ok)
 	}
     }
 }
-
-void frontend_net_error_pending(void) {}
 
 /*
  * Main program: do platform-specific initialisation and then call

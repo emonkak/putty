@@ -548,8 +548,7 @@ char *fxp_realpath_recv(struct sftp_packet *pktin, struct sftp_request *req)
 /*
  * Open a file.
  */
-struct sftp_request *fxp_open_send(char *path, int type,
-                                   struct fxp_attrs *attrs)
+struct sftp_request *fxp_open_send(char *path, int type)
 {
     struct sftp_request *req = sftp_alloc_request();
     struct sftp_packet *pktout;
@@ -558,10 +557,7 @@ struct sftp_request *fxp_open_send(char *path, int type,
     sftp_pkt_adduint32(pktout, req->id);
     sftp_pkt_addstring(pktout, path);
     sftp_pkt_adduint32(pktout, type);
-    if (attrs)
-        sftp_pkt_addattrs(pktout, *attrs);
-    else
-        sftp_pkt_adduint32(pktout, 0); /* empty ATTRS structure */
+    sftp_pkt_adduint32(pktout, 0);     /* (FIXME) empty ATTRS structure */
     sftp_send(pktout);
 
     return req;

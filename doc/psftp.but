@@ -1,4 +1,4 @@
-\define{versionidpsftp} \versionid $Id$
+\define{versionidpsftp} \versionid $Id: psftp.but 8325 2008-11-24 18:19:55Z jacob $
 
 \C{psftp} Using \i{PSFTP} to transfer files securely
 

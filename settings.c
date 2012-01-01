@@ -432,11 +432,20 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "ApplicationCursorKeys", cfg->app_cursor);
     write_setting_i(sesskey, "ApplicationKeypad", cfg->app_keypad);
     write_setting_i(sesskey, "NetHackKeypad", cfg->nethack_keypad);
+    /*
+     * HACK: PuttyTray / Reconnect
+     */
+    write_setting_i(sesskey, "WakeupReconnect", cfg->wakeup_reconnect);
+    write_setting_i(sesskey, "FailureReconnect", cfg->failure_reconnect);
+
     write_setting_i(sesskey, "AltF4", cfg->alt_f4);
     write_setting_i(sesskey, "AltSpace", cfg->alt_space);
     write_setting_i(sesskey, "AltOnly", cfg->alt_only);
+    write_setting_i(sesskey, "AltMetaBit", cfg->alt_metabit);
+    write_setting_i(sesskey, "CtrlTabSwitch", cfg->ctrl_tab_switch);
     write_setting_i(sesskey, "ComposeKey", cfg->compose_key);
     write_setting_i(sesskey, "CtrlAltKeys", cfg->ctrlaltkeys);
+    write_setting_i(sesskey, "RightAltKey", cfg->rightaltkey);
     write_setting_i(sesskey, "TelnetKey", cfg->telnet_keyboard);
     write_setting_i(sesskey, "TelnetRet", cfg->telnet_newline);
     write_setting_i(sesskey, "LocalEcho", cfg->localecho);
@@ -446,6 +455,7 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "FullScreenOnAltEnter", cfg->fullscreenonaltenter);
     write_setting_i(sesskey, "HideMousePtr", cfg->hide_mouseptr);
     write_setting_i(sesskey, "SunkenEdge", cfg->sunken_edge);
+    write_setting_filename(sesskey, "IconFile", cfg->iconfile);
     write_setting_i(sesskey, "WindowBorder", cfg->window_border);
     write_setting_i(sesskey, "CurType", cfg->cursor_type);
     write_setting_i(sesskey, "BlinkCur", cfg->blink_cur);
@@ -475,6 +485,8 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_s(sesskey, "WinTitle", cfg->wintitle);
     write_setting_i(sesskey, "TermWidth", cfg->width);
     write_setting_i(sesskey, "TermHeight", cfg->height);
+    write_setting_i(sesskey, "TermX", cfg->x);
+    write_setting_i(sesskey, "TermY", cfg->y);
     write_setting_fontspec(sesskey, "Font", cfg->font);
     write_setting_i(sesskey, "FontQuality", cfg->font_quality);
     write_setting_i(sesskey, "FontVTMode", cfg->vtmode);
@@ -484,7 +496,7 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "Xterm256Colour", cfg->xterm_256_colour);
     write_setting_i(sesskey, "BoldAsColour", cfg->bold_colour);
 
-    for (i = 0; i < 22; i++) {
+    for (i = 0; i < 24; i++) {
 	char buf[20], buf2[30];
 	sprintf(buf, "Colour%d", i);
 	sprintf(buf2, "%d,%d,%d", cfg->colours[i][0],
@@ -493,6 +505,7 @@ void save_open_settings(void *sesskey, Config *cfg)
     }
     write_setting_i(sesskey, "RawCNP", cfg->rawcnp);
     write_setting_i(sesskey, "PasteRTF", cfg->rtf_paste);
+    write_setting_s(sesskey, "IgnoreChars", cfg->ignore_chars);
     write_setting_i(sesskey, "MouseIsXterm", cfg->mouse_is_xterm);
     write_setting_i(sesskey, "RectSelect", cfg->rect_select);
     write_setting_i(sesskey, "MouseOverride", cfg->mouse_override);
@@ -512,6 +525,7 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "UTF8Override", cfg->utf8_override);
     write_setting_s(sesskey, "Printer", cfg->printer);
     write_setting_i(sesskey, "CapsLockCyr", cfg->xlat_capslockcyr);
+    write_setting_i(sesskey, "Use5Casis", cfg->use_5casis);
     write_setting_i(sesskey, "ScrollBar", cfg->scrollbar);
     write_setting_i(sesskey, "ScrollBarFullScreen", cfg->scrollbar_in_fullscreen);
     write_setting_i(sesskey, "ScrollOnKey", cfg->scroll_on_key);
@@ -545,6 +559,13 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_fontspec(sesskey, "WideBoldFont", cfg->wideboldfont);
     write_setting_i(sesskey, "ShadowBold", cfg->shadowbold);
     write_setting_i(sesskey, "ShadowBoldOffset", cfg->shadowboldoffset);
+    /* > transparent background patch */
+    write_setting_i( sesskey, "TransparentMode", cfg->transparent_mode );
+    write_setting_i( sesskey, "Shading", cfg->shading );
+    write_setting_i( sesskey, "UseAlphaBlend", cfg->use_alphablend );
+    write_setting_i( sesskey, "StoppedToDraw", cfg->stop_when_moving );
+    write_setting_filename( sesskey, "BackgroundImageFile", cfg->bgimg_file );
+    /* < */
     write_setting_s(sesskey, "SerialLine", cfg->serline);
     write_setting_i(sesskey, "SerialSpeed", cfg->serspeed);
     write_setting_i(sesskey, "SerialDataBits", cfg->serdatabits);
@@ -552,6 +573,11 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "SerialParity", cfg->serparity);
     write_setting_i(sesskey, "SerialFlowControl", cfg->serflow);
     write_setting_s(sesskey, "WindowClass", cfg->winclass);
+
+    /* Hyperlink */
+    write_setting_i(sesskey, "HyperlinkEnable", cfg->url_enable);
+    write_setting_i(sesskey, "HyperlinkUnderline", cfg->url_underline);
+    write_setting_i(sesskey, "HyperlinkUseCtrlClick", cfg->url_ctrl_click);
 }
 
 void load_settings(char *section, Config * cfg)
@@ -739,11 +765,20 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "ApplicationCursorKeys", 0, &cfg->app_cursor);
     gppi(sesskey, "ApplicationKeypad", 0, &cfg->app_keypad);
     gppi(sesskey, "NetHackKeypad", 0, &cfg->nethack_keypad);
+    /*
+     * HACK: PuttyTray / Reconnect
+     */
+    gppi(sesskey, "WakeupReconnect", 0, &cfg->wakeup_reconnect);
+    gppi(sesskey, "FailureReconnect", 0, &cfg->failure_reconnect);
+
     gppi(sesskey, "AltF4", 1, &cfg->alt_f4);
     gppi(sesskey, "AltSpace", 0, &cfg->alt_space);
     gppi(sesskey, "AltOnly", 0, &cfg->alt_only);
+    gppi(sesskey, "AltMetaBit", 0, &cfg->alt_metabit);
+    gppi(sesskey, "CtrlTabSwitch", 0, &cfg->ctrl_tab_switch);
     gppi(sesskey, "ComposeKey", 0, &cfg->compose_key);
     gppi(sesskey, "CtrlAltKeys", 1, &cfg->ctrlaltkeys);
+    gppi(sesskey, "RightAltKey", 0, &cfg->rightaltkey);
     gppi(sesskey, "TelnetKey", 0, &cfg->telnet_keyboard);
     gppi(sesskey, "TelnetRet", 1, &cfg->telnet_newline);
     gppi(sesskey, "LocalEcho", AUTO, &cfg->localecho);
@@ -754,9 +789,38 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "FullScreenOnAltEnter", 0, &cfg->fullscreenonaltenter);
     gppi(sesskey, "HideMousePtr", 0, &cfg->hide_mouseptr);
     gppi(sesskey, "SunkenEdge", 0, &cfg->sunken_edge);
+    gppfile(sesskey, "IconFile", &cfg->iconfile);
     gppi(sesskey, "WindowBorder", 1, &cfg->window_border);
     gppi(sesskey, "CurType", 0, &cfg->cursor_type);
     gppi(sesskey, "BlinkCur", 0, &cfg->blink_cur);
+    {
+      int key, mod, len;
+      char tmp[24];
+      char buf[256];
+      int max, t;
+      for (key = 0; key < 256; key++) {
+	sprintf(tmp, "VKey%d", key);
+	gpps(sesskey, tmp, "", buf, sizeof(buf));
+	max = strlen(buf);
+	if (!max) {
+	  continue;
+	}
+	t = 0;
+	for (mod = 0; mod < 8; mod++) {
+	  for (len = 0; (t < max) && (buf[t] != ',') && (len < 15); len++, t++) {
+	    if (buf[t] == '\\') {
+	      sscanf(&buf[++t], "%03o", &cfg->pvkey_codes[key][mod][len]);
+	      t += 2;
+	      continue;
+	    }
+	    cfg->pvkey_codes[key][mod][len] = buf[t];
+	  }
+	  cfg->pvkey_length[key][mod] = len;
+	  cfg->pvkey_codes[key][mod][len] = '\0';
+	  t++;
+	}
+      }
+    }
     /* pedantic compiler tells me I can't use &cfg->beep as an int * :-) */
     gppi(sesskey, "Beep", 1, &cfg->beep);
     gppi(sesskey, "BeepInd", 0, &cfg->beep_ind);
@@ -794,6 +858,8 @@ void load_open_settings(void *sesskey, Config *cfg)
     gpps(sesskey, "WinTitle", "", cfg->wintitle, sizeof(cfg->wintitle));
     gppi(sesskey, "TermWidth", 80, &cfg->width);
     gppi(sesskey, "TermHeight", 24, &cfg->height);
+    gppi(sesskey, "TermX", CW_USEDEFAULT, &cfg->x);
+    gppi(sesskey, "TermY", CW_USEDEFAULT, &cfg->y);
     gppfont(sesskey, "Font", &cfg->font);
     gppi(sesskey, "FontQuality", FQ_DEFAULT, &cfg->font_quality);
     gppi(sesskey, "FontVTMode", VT_UNICODE, (int *) &cfg->vtmode);
@@ -803,14 +869,15 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "Xterm256Colour", 1, &cfg->xterm_256_colour);
     gppi(sesskey, "BoldAsColour", 1, &cfg->bold_colour);
 
-    for (i = 0; i < 22; i++) {
+    for (i = 0; i < 24; i++) {
 	static const char *const defaults[] = {
 	    "187,187,187", "255,255,255", "0,0,0", "85,85,85", "0,0,0",
 	    "0,255,0", "0,0,0", "85,85,85", "187,0,0", "255,85,85",
 	    "0,187,0", "85,255,85", "187,187,0", "255,255,85", "0,0,187",
 	    "85,85,255", "187,0,187", "255,85,255", "0,187,187",
-	    "85,255,255", "187,187,187", "255,255,255"
-	};
+	    "85,255,255", "187,187,187", "255,255,255", 
+	    "0,0,0", "255,0,0"
+  };
 	char buf[20], buf2[30];
 	int c0, c1, c2;
 	sprintf(buf, "Colour%d", i);
@@ -823,6 +890,8 @@ void load_open_settings(void *sesskey, Config *cfg)
     }
     gppi(sesskey, "RawCNP", 0, &cfg->rawcnp);
     gppi(sesskey, "PasteRTF", 0, &cfg->rtf_paste);
+    gpps(sesskey, "IgnoreChars", "", cfg->ignore_chars,
+	 sizeof(cfg->ignore_chars));
     gppi(sesskey, "MouseIsXterm", 0, &cfg->mouse_is_xterm);
     gppi(sesskey, "RectSelect", 0, &cfg->rect_select);
     gppi(sesskey, "MouseOverride", 1, &cfg->mouse_override);
@@ -855,12 +924,30 @@ void load_open_settings(void *sesskey, Config *cfg)
      * The empty default for LineCodePage will be converted later
      * into a plausible default for the locale.
      */
-    gpps(sesskey, "LineCodePage", "", cfg->line_codepage,
+    {
+      char buf[32];
+      get_l10n_setting("_LINECODEPAGE_", buf, sizeof (buf));
+      gpps(sesskey, "LineCodePage", buf, cfg->line_codepage,
 	 sizeof(cfg->line_codepage));
+    }
+    if (!strcmp (cfg->line_codepage, "UTF-8")) {
+	int i;
+	char buf[lenof (cfg->line_codepage)];
+
+	gppi (sesskey, "ISO2022", 0, &i);  /* for compatibility with old patch */
+	if (i) {
+		strcpy (buf, "iso2022 ");
+		gpps (sesskey, "ISO2022initstr", "", &buf[8],
+			sizeof buf - 8 * sizeof buf[0]);
+		if (buf[8]) memcpy (cfg->line_codepage, buf,
+				    sizeof cfg->line_codepage);
+	}
+    }
     gppi(sesskey, "CJKAmbigWide", 0, &cfg->cjk_ambig_wide);
     gppi(sesskey, "UTF8Override", 1, &cfg->utf8_override);
     gpps(sesskey, "Printer", "", cfg->printer, sizeof(cfg->printer));
     gppi (sesskey, "CapsLockCyr", 0, &cfg->xlat_capslockcyr);
+    gppi (sesskey, "Use5Casis", 0, &cfg->use_5casis);
     gppi(sesskey, "ScrollBar", 1, &cfg->scrollbar);
     gppi(sesskey, "ScrollBarFullScreen", 0, &cfg->scrollbar_in_fullscreen);
     gppi(sesskey, "ScrollOnKey", 0, &cfg->scroll_on_key);
@@ -905,6 +992,13 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppfont(sesskey, "WideFont", &cfg->widefont);
     gppfont(sesskey, "WideBoldFont", &cfg->wideboldfont);
     gppi(sesskey, "ShadowBoldOffset", 1, &cfg->shadowboldoffset);
+    /* > transparent background patch */
+    gppi( sesskey, "TransparentMode", 0, &cfg->transparent_mode );
+    gppi( sesskey, "Shading", 0, &cfg->shading );
+    gppi( sesskey, "UseAlphaBlend", 0, &cfg->use_alphablend );
+    gppi( sesskey, "StoppedToDraw", 0, &cfg->stop_when_moving );
+    gppfile( sesskey, "BackgroundImageFile", &cfg->bgimg_file );
+    /* < */
     gpps(sesskey, "SerialLine", "", cfg->serline, sizeof(cfg->serline));
     gppi(sesskey, "SerialSpeed", 9600, &cfg->serspeed);
     gppi(sesskey, "SerialDataBits", 8, &cfg->serdatabits);
@@ -912,6 +1006,11 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "SerialParity", SER_PAR_NONE, &cfg->serparity);
     gppi(sesskey, "SerialFlowControl", SER_FLOW_XONXOFF, &cfg->serflow);
     gpps(sesskey, "WindowClass", "", cfg->winclass, sizeof(cfg->winclass));
+
+    /* Hyperlink */
+    gppi(sesskey, "HyperlinkEnable", 1, &cfg->url_enable);
+    gppi(sesskey, "HyperlinkUnderline", 1, &cfg->url_underline);
+    gppi(sesskey, "HyperlinkUseCtrlClick", 1, &cfg->url_ctrl_click);
 }
 
 void do_defaults(char *session, Config * cfg)

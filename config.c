@@ -351,7 +351,10 @@ static void codepage_handler(union control *ctrl, void *dlg,
 	int i;
 	const char *cp, *thiscp;
 	dlg_update_start(ctrl, dlg);
-	thiscp = cp_name(decode_codepage(cfg->line_codepage));
+	if (decode_codepage (cfg->line_codepage) != CP_UTF8 || iso2022_init_test (cfg->line_codepage))
+	    thiscp = cp_name(decode_codepage(cfg->line_codepage));
+	else
+	    thiscp = cfg->line_codepage;
 	dlg_listbox_clear(ctrl, dlg);
 	for (i = 0; (cp = cp_enumerate(i)) != NULL; i++)
 	    dlg_listbox_add(ctrl, dlg, cp);
@@ -361,6 +364,7 @@ static void codepage_handler(union control *ctrl, void *dlg,
     } else if (event == EVENT_VALCHANGE) {
 	dlg_editbox_get(ctrl, dlg, cfg->line_codepage,
 			sizeof(cfg->line_codepage));
+	if (decode_codepage (cfg->line_codepage) != CP_UTF8 || iso2022_init_test (cfg->line_codepage))
 	strcpy(cfg->line_codepage,
 	       cp_name(decode_codepage(cfg->line_codepage)));
     }
@@ -646,7 +650,8 @@ static const char *const colours[] = {
     "ANSI Blue", "ANSI Blue Bold",
     "ANSI Magenta", "ANSI Magenta Bold",
     "ANSI Cyan", "ANSI Cyan Bold",
-    "ANSI White", "ANSI White Bold"
+    "ANSI White", "ANSI White Bold",
+    "Cursor Text(IME ON)", "Cursor Colour(IME ON)",
 };
 
 static void colour_handler(union control *ctrl, void *dlg,
@@ -1683,6 +1688,14 @@ void setup_config_box(struct controlbox *b, int midsession,
     ccd->button->generic.column = 1;
     ctrl_columns(s, 1, 100);
 
+    s = ctrl_getset(b, "Window/Selection", "format",
+		    "Formatting of pasted characters");
+    ctrl_editbox(s, "Ignore characters", 'i', 50,
+		 HELPCTX(ignore_chars),
+		 dlg_stdeditbox_handler,
+		 I(offsetof(Config,ignore_chars)),
+		 I(sizeof(((Config *)0)->ignore_chars)));
+
     /*
      * The Window/Colours panel.
      */
@@ -1727,6 +1740,28 @@ void setup_config_box(struct controlbox *b, int midsession,
 				 colour_handler, P(cd));
     cd->button->generic.column = 1;
     ctrl_columns(s, 1, 100);
+
+    /* Hyperlink */
+    ctrl_settitle(b, "Window/Hyperlinks",
+		  "Options controlling behaviour of hyperlinks");
+    s = ctrl_getset(b, "Window/Hyperlinks", "general",
+		    "General options for hyperlinks");
+    ctrl_checkbox(s, "Enable hyperlinks", NO_SHORTCUT,
+		  HELPCTX(no_help),
+		  dlg_stdcheckbox_handler,
+		  I(offsetof(Config, url_enable)));
+    ctrl_checkbox(s, "Press Ctrl to click hyperlinks", NO_SHORTCUT,
+		  HELPCTX(no_help),
+		  dlg_stdcheckbox_handler,
+		  I(offsetof(Config, url_ctrl_click)));
+    ctrl_radiobuttons(s, "Underline hyperlinks:", NO_SHORTCUT, 1,
+		      HELPCTX(no_help),
+		      dlg_stdradiobutton_handler,
+		      I(offsetof(Config, url_underline)),
+		      "Always", NO_SHORTCUT, I(URL_UNDERLINE_ALWAYS),
+		      "When hovered upon", NO_SHORTCUT, I(URL_UNDERLINE_HOVER),
+		      "Never", NO_SHORTCUT, I(URL_UNDERLINE_NEVER),
+		      NULL);
 
     /*
      * The Connection panel. This doesn't show up if we're in a

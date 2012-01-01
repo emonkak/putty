@@ -61,7 +61,7 @@ typedef struct terminal_tag Terminal;
 
 #define DATTR_STARTRUN      0x80000000UL   /* start of redraw run */
 
-#define TDATTR_MASK         0xF0000000UL
+#define TDATTR_MASK         0xF0000000ULL
 #define TATTR_MASK (TDATTR_MASK)
 #define DATTR_MASK (TDATTR_MASK)
 
@@ -75,7 +75,7 @@ typedef struct terminal_tag Terminal;
 					  wrapped to next line, so last
 					  single-width cell is empty */
 
-#define ATTR_INVALID 0x03FFFFU
+#define ATTR_INVALID 0x03FFFFUL
 
 /* Like Linux use the F000 page for direct to font. */
 #define CSET_OEMCP   0x0000F000UL      /* OEM Codepage DTF */
@@ -137,10 +137,75 @@ typedef struct terminal_tag Terminal;
 #define ATTR_DEFBG   (258 << ATTR_BGSHIFT)
 #define ATTR_DEFAULT (ATTR_DEFFG | ATTR_DEFBG)
 
+/* Hyperlink */
+#define TATTR_URLMASK	0xFF00000000ULL
+#define TATTR_URLSHIFT	32
+#define TATTR_URLMAX	0xFF
+
+#define IGNORE_CHARS_MAX 8
+
 struct sesslist {
     int nsessions;
     char **sessions;
     char *buffer;		       /* so memory can be freed later */
+};
+
+struct iso2022struct
+{
+  unsigned char buf[100];
+  int buflen, bufoff;
+  struct g
+  {
+    enum
+    {
+      UNKNOWN, UNSUPPORTED, US_ASCII, JISX0201_ROMAN, JISX0201_KATAKANA,
+      JISC6226_1978, JISX0208_1983, JISX0208_1990, JISX0212_1990,
+      JISX0213_1, JISX0213_2, JISX0213_2004_1, MS_KANJI,
+      GB2312_80, CSIC_SET1, CSIC_SET2, CSIC_SET3, CSIC_SET4, CSIC_SET5,
+      CSIC_SET6, CSIC_SET7, KSC5601_1987, BIG5,
+      ISO8859_1, ISO8859_2, ISO8859_3, ISO8859_4, ISO8859_5,
+      ISO8859_6, ISO8859_7, ISO8859_8, ISO8859_9, ISO8859_10,
+      VT100GRAPHICS,
+      ISO646_1973IRV, BS4730, NATS_PRIMARY_FINLAND_SWEDEN,
+      NATS_PRIMARY_DENMARK_NORWAY, DIN66003, NFZ62010_1973,
+      ISO646_ITALIAN, ISO646_SPANISH,
+      UTF8CJK, UTF8NONCJK,
+    } type;
+    int len;
+  } g0, g1, g2, g3, *gl, *gr, *ssl, *ssr, lgr, *usgr, uslgr;
+  int jisx02081990flag;
+  int esc;
+  int width;
+  int lockgr, uslockgr;
+  int ssgr;
+  int transchar;
+  enum {
+    SWITCH_UTF8_NONE,
+    SWITCH_UTF8_TO_UTF8,
+    SWITCH_UTF8_FROM_UTF8,
+  } switch_utf8;
+  unsigned char *ins;
+  unsigned char *insw;
+  int inslen;
+};
+
+#define AUTODETECT_BUFLEN 10
+
+struct iso2022_data {
+  int win95flag;
+  struct iso2022struct rcv, trns;
+  unsigned char initstring[512];
+  struct {
+    int n;
+    struct {
+      int n;
+      struct iso2022_autodetect_jp {
+	int e;
+	unsigned char buf[AUTODETECT_BUFLEN];
+	int buflen;
+      } eucjp, mskanji, utf8cjk;
+    } jp;
+  } autodetect;
 };
 
 struct unicode_data {
@@ -154,6 +219,8 @@ struct unicode_data {
     wchar_t unitab_xterm[256];
     wchar_t unitab_oemcp[256];
     unsigned char unitab_ctrl[256];
+    int iso2022;
+    struct iso2022_data iso2022_data;
 };
 
 #define LGXF_OVR  1		       /* existing logfile overwrite */
@@ -413,6 +480,11 @@ enum {
     ADDRTYPE_UNSPEC, ADDRTYPE_IPV4, ADDRTYPE_IPV6, ADDRTYPE_NAME
 };
 
+/* Hyperlink */
+enum {
+    URL_UNDERLINE_ALWAYS, URL_UNDERLINE_HOVER, URL_UNDERLINE_NEVER
+};
+
 struct backend_tag {
     const char *(*init) (void *frontend_handle, void **backend_handle,
 			 Config *cfg,
@@ -559,6 +631,8 @@ struct config_tag {
     int alt_f4;			       /* is it special? */
     int alt_space;		       /* is it special? */
     int alt_only;		       /* is it special? */
+    int alt_metabit;		       /* set meta instead of escape */
+    int ctrl_tab_switch;	       /* switch PuTTY windows with Ctrl+Tab */
     int localecho;
     int localedit;
     int alwaysontop;
@@ -568,6 +642,9 @@ struct config_tag {
     int erase_to_scrollback;
     int compose_key;
     int ctrlaltkeys;
+    int rightaltkey;
+    int pvkey_length[256][8];
+    char pvkey_codes[256][8][16];
     char wintitle[256];		       /* initial window title */
     /* Terminal options */
     int savelines;
@@ -590,6 +667,7 @@ struct config_tag {
     int blinktext;
     int win_name_always;
     int width, height;
+    int x, y;
     FontSpec font;
     int font_quality;
     Filename logfilename;
@@ -611,12 +689,13 @@ struct config_tag {
     int system_colour;
     int try_palette;
     int bold_colour;
-    unsigned char colours[22][3];
+    unsigned char colours[24][3];
     /* Selection options */
     int mouse_is_xterm;
     int rect_select;
     int rawcnp;
     int rtf_paste;
+    char ignore_chars[4 * IGNORE_CHARS_MAX + 1];
     int mouse_override;
     short wordness[256];
     /* translations */
@@ -625,6 +704,7 @@ struct config_tag {
     int cjk_ambig_wide;
     int utf8_override;
     int xlat_capslockcyr;
+    int use_5casis;
     /* X11 forwarding */
     int x11_forward;
     char x11_display[128];
@@ -667,6 +747,25 @@ struct config_tag {
     int shadowboldoffset;
     int crhaslf;
     char winclass[256];
+	/* > transparent background patch */
+	int transparent_mode;
+	int shading;
+	int use_alphablend;
+    int stop_when_moving;
+    Filename bgimg_file;
+	/* < */
+    Filename iconfile;
+ 
+    /*
+     * HACK: PuttyTray / Reconnect
+     */
+    int wakeup_reconnect;
+    int failure_reconnect;
+
+    /* Hyperlink */
+    int url_enable;
+    int url_underline;
+    int url_ctrl_click;
 };
 
 /*
@@ -766,8 +865,8 @@ void free_prompts(prompts_t *p);
  * Exports from the front end.
  */
 void request_resize(void *frontend, int, int);
-void do_text(Context, int, int, wchar_t *, int, unsigned long, int);
-void do_cursor(Context, int, int, wchar_t *, int, unsigned long, int);
+void do_text(Context, int, int, wchar_t *, int, unsigned long long, int);
+void do_cursor(Context, int, int, wchar_t *, int, unsigned long long, int);
 int char_width(Context ctx, int uc);
 #ifdef OPTIMISE_SCROLL
 void do_scroll(Context, int, int, int);
@@ -1195,6 +1294,7 @@ int filename_equal(Filename f1, Filename f2);
 int filename_is_null(Filename fn);
 char *get_username(void);	       /* return value needs freeing */
 char *get_random_data(int bytes);      /* used in cmdgen.c */
+void exec_browser(char *url);
 
 /*
  * Exports and imports from timing.c.
@@ -1302,5 +1402,35 @@ void timer_change_notify(long next);
 #define add_session_to_jumplist(x) ((void)0)
 #define remove_session_from_jumplist(x) ((void)0)
 #endif
+
+/*
+ * Exports from iso2022.c
+ */
+int xMultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);
+int xWideCharToMultiByte(UINT, DWORD, LPCWSTR, int, LPSTR, int,
+                         LPCSTR, LPBOOL);
+#define MultiByteToWideChar xMultiByteToWideChar
+#define WideCharToMultiByte xWideCharToMultiByte
+
+int iso2022_init (struct iso2022_data *this, char *p, int mode);
+int iso2022_init_test (char *p);
+void iso2022_transmit (struct iso2022_data *this, unsigned char c);
+void iso2022_put (struct iso2022_data *this, unsigned char c);
+void iso2022_clearesc (struct iso2022_data *this);
+int iso2022_width (struct iso2022_data *this, wchar_t);
+unsigned char iso2022_tgetbuf (struct iso2022_data *this);
+unsigned char iso2022_getbuf (struct iso2022_data *this);
+void iso2022_settranschar (struct iso2022_data *this, int value);
+void iso2022_tbufclear (struct iso2022_data *this);
+int iso2022_tbuflen (struct iso2022_data *this);
+int iso2022_buflen (struct iso2022_data *this);
+void iso2022_autodetect_put (struct iso2022_data *this, unsigned char *buf,
+			     int nchars);
+
+/*
+ * Exports from l10n.c
+ */
+char *l10n_dupstr (char *);
+int get_l10n_setting(const char* keyname, char* buf, int size);
 
 #endif

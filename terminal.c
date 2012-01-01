@@ -110,6 +110,47 @@ static void scroll(Terminal *, int, int, int, int);
 static void scroll_display(Terminal *, int, int, int);
 #endif /* OPTIMISE_SCROLL */
 
+/* Hyperlink */
+static int mb_to_uc(int codepage, int flags, char *mbstr, int mblen,
+                    unsigned long *ucstr, int uclen)
+{
+    int len = mb_to_wc(codepage, flags, mbstr, mblen,
+		       (wchar_t *)ucstr, uclen);
+    int i;
+
+#ifdef PLATFORM_IS_UTF16
+    int tlen = len;
+    unsigned long *p = ucstr;
+    wchar_t *wcstr = snewn(len + 1, wchar_t);
+    memcpy(wcstr, ucstr, len * sizeof(wchar_t));
+
+    for (i = 0; i < tlen; i++) {
+	wchar_t c = wcstr[i];
+	wchar_t c2 = wcstr[i + 1];
+	unsigned long uc;
+	if (((c & 0xfc00) == 0xd800) && ((c2 & 0xfc00) == 0xdc00)) {
+	    uc = 0x10000 + ((c & 0x3FF) << 10) + (c2 & 0x3FF);
+	    i++;
+	    len--;
+	} else {
+	    uc = c;
+	}
+	*p = uc;
+	p++;
+    }
+
+    sfree(wcstr);
+#endif
+
+    for (i = 0; i < len; i++) {
+	if (ucstr[i] && !(ucstr[i] & 0xFFFFFF80UL)) {
+	    ucstr[i] |= CSET_ASCII;
+	}
+    }
+
+    return len;
+}
+
 static termline *newline(Terminal *term, int cols, int bce)
 {
     termline *line;
@@ -278,7 +319,8 @@ static void clear_cc(termline *line, int col)
  * fields to be.
  */
 static int termchars_equal_override(termchar *a, termchar *b,
-				    unsigned long bchr, unsigned long battr)
+				    unsigned long bchr,
+				    unsigned long long battr)
 {
     /* FULL-TERMCHAR */
     if (a->chr != bchr)
@@ -578,7 +620,7 @@ static void makeliteral_attr(struct buf *b, termchar *c, unsigned long *state)
      * ensures that attribute values remain 16-bit _unless_ the
      * user uses extended colour.
      */
-    unsigned attr, colourbits;
+    unsigned long long attr, colourbits;
 
     attr = c->attr;
 
@@ -799,7 +841,7 @@ static void readliteral_chr(struct buf *b, termchar *c, termline *ldata,
 static void readliteral_attr(struct buf *b, termchar *c, termline *ldata,
 			     unsigned long *state)
 {
-    unsigned val, attr, colourbits;
+    unsigned long long val, attr, colourbits;
 
     val = get(b) << 8;
     val |= get(b);
@@ -1184,6 +1226,7 @@ static void term_schedule_vbell(Terminal *term, int already_started,
  */
 static void power_on(Terminal *term, int clear)
 {
+    if (in_utf (term)) term->ucsdata->iso2022 = !iso2022_init (&term->ucsdata->iso2022_data, term->cfg.line_codepage, 0);
     term->alt_x = term->alt_y = 0;
     term->savecurs.x = term->savecurs.y = 0;
     term->alt_savecurs.x = term->alt_savecurs.y = 0;
@@ -1403,6 +1446,11 @@ void term_reconfig(Terminal *term, Config *cfg)
     }
     term_schedule_tblink(term);
     term_schedule_cblink(term);
+
+    /* Ignore Chars */
+    memset(term->ignore_uchars, 0, sizeof(term->ignore_uchars));
+    term->ignore_length = mb_to_uc(CP_UTF8, 0, term->cfg.ignore_chars, -1,
+                                   term->ignore_uchars, IGNORE_CHARS_MAX);
 }
 
 /*
@@ -1496,6 +1544,11 @@ Terminal *term_init(Config *mycfg, struct unicode_data *ucsdata,
     term->basic_erase_char.attr = ATTR_DEFAULT;
     term->basic_erase_char.cc_next = 0;
     term->erase_char = term->basic_erase_char;
+
+    /* Ignore Chars */
+    memset(term->ignore_uchars, 0, sizeof(term->ignore_uchars));
+    term->ignore_length = mb_to_uc(CP_UTF8, 0, term->cfg.ignore_chars, -1,
+                                   term->ignore_uchars, IGNORE_CHARS_MAX);
 
     return term;
 }
@@ -2526,18 +2579,27 @@ static void term_out(Terminal *term)
     int unget;
     unsigned char localbuf[256], *chars;
     int nchars = 0;
+    int iso2022;
+    struct iso2022_data *iso2022_data_p;
 
     unget = -1;
 
+    iso2022 = in_utf (term) && term->ucsdata->iso2022;
+    if (iso2022) iso2022_data_p = &term->ucsdata->iso2022_data;
     chars = NULL;		       /* placate compiler warnings */
-    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0) {
+    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0 || (iso2022 && iso2022_buflen (iso2022_data_p) > 0)) {
 	if (unget == -1) {
+	    if (iso2022 && term->termstate == TOPLEVEL) iso2022_clearesc (iso2022_data_p);
+	    if (!iso2022 || !iso2022_buflen (iso2022_data_p)) {
 	    if (nchars == 0) {
 		void *ret;
 		bufchain_prefix(&term->inbuf, &ret, &nchars);
 		if (nchars > sizeof(localbuf))
 		    nchars = sizeof(localbuf);
 		memcpy(localbuf, ret, nchars);
+		if (iso2022) {
+		     iso2022_autodetect_put (iso2022_data_p, localbuf, nchars);
+		}
 		bufchain_consume(&term->inbuf, nchars);
 		chars = localbuf;
 		assert(chars != NULL);
@@ -2551,6 +2613,12 @@ static void term_out(Terminal *term)
 	     */
 	    if (term->cfg.logtype == LGTYP_DEBUG && term->logctx)
 		logtraffic(term->logctx, (unsigned char) c, LGTYP_DEBUG);
+	    if (iso2022) iso2022_put (iso2022_data_p, c);
+	    }
+	    if (iso2022) {
+		if (iso2022_buflen (iso2022_data_p) > 0) c = iso2022_getbuf (iso2022_data_p);
+		else continue;
+	    }
 	} else {
 	    c = unget;
 	    unget = -1;
@@ -2660,6 +2728,7 @@ static void term_out(Terminal *term)
 		    /* The UTF-16 surrogates are not nice either. */
 		    /*       The standard give the option of decoding these: 
 		     *       I don't want to! */
+		    if (!iso2022) /* for VT100 graphics */
 		    if (c >= 0xD800 && c < 0xE000)
 			c = UCSERR;
 
@@ -2940,12 +3009,14 @@ static void term_out(Terminal *term)
 		{
 		    termline *cline = scrlineptr(term->curs.y);
 		    int width = 0;
+		    if (!iso2022) {
 		    if (DIRECT_CHAR(c))
 			width = 1;
 		    if (!width)
 			width = (term->cfg.cjk_ambig_wide ?
 				 mk_wcwidth_cjk((wchar_t) c) :
 				 mk_wcwidth((wchar_t) c));
+		    } else width = iso2022_width (iso2022_data_p, (wchar_t) c);
 
 		    if (term->wrapnext && term->wrap && width > 0) {
 			cline->lattr |= LATTR_WRAPPED;
@@ -2964,6 +3035,25 @@ static void term_out(Terminal *term)
 			incpos(cursplus);
 			check_selection(term, term->curs, cursplus);
 		    }
+		    if (term->cfg.logtype == LGTYP_ASCII && iso2022
+			    && term->utf_char == (int) c
+			    && 0x7f < c && c < 0x80000000
+			    && term->logctx) {
+			// output non ASCII characters by UTF-8 encoding
+			int i;
+			for (i = 5; i > 1 && (c & (0x1f << (i * 5 + 1))) == 0; i--)
+			    ;
+			{
+			    int shifts = i * 6;
+			    int mask = (1 << (5 - i + 1)) - 1;
+			    int prebits = (0xff & ~((1 << (5 - i + 2)) - 1));
+			    logtraffic(term->logctx, (unsigned char) (prebits | ((c >> shifts) & mask)), LGTYP_ASCII);
+			    do {
+				shifts -= 6;
+				logtraffic(term->logctx, (unsigned char) (0x80 | ((c >> shifts) & 0x3f)), LGTYP_ASCII);
+			    } while (shifts > 0);
+			}
+		    } else
 		    if (((c & CSET_MASK) == CSET_ASCII ||
 			 (c & CSET_MASK) == 0) &&
 			term->logctx)
@@ -4664,6 +4754,125 @@ static termchar *term_bidi_line(Terminal *term, struct termline *ldata,
     return lchars;
 }
 
+/* Ignore Chars */
+static int ignore_uchar(unsigned long uc)
+{
+    int i;
+    int l = term->ignore_length - 1;
+    for (i = 0; i < l; i++) {
+	if (uc == term->ignore_uchars[i]) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+/* Hyperlink */
+
+static int url_header(unsigned char achar, int state)
+{
+    static unsigned char header[] = "https://";
+
+    if (achar == header[state]) {
+	return ++state;
+    }
+    if (state == 4) {
+	state++;
+	if (achar == header[state]) {
+	    return ++state;
+	}
+    }
+    return 0;
+}
+
+static void find_url(Terminal *term)
+{
+    static char url_char[] = {
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,1,0,1,1,1,1,0,0,0,1,1,1,1,1,1, /*  !"#$%&'()*+,-./ */
+	1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1, /* 0123456789:;<=>? */
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, /* @ABCDEFGHIJKLMNO */
+	1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,1, /* PQRSTUVWXYZ[\]^_ */
+	0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, /* `abcdefghijklmno */
+	1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,0, /* pqrstuvwxyz{|}~  */
+    };
+
+    int i, j;
+    int state = 0;
+    unsigned char link = 1;
+    int start = 0;
+    for (i = 0; i < term->rows; i++) {
+	termline *ldata = lineptr(i + term->disptop);
+	termchar *lchars = ldata->chars;
+	termchar *ldisp = term->disptext[i]->chars;
+	for (j = 0; j < term->cols; j++) {
+	    termchar *d = lchars + j;
+	    termchar *e = ldisp + j;
+	    unsigned char c = d->chr & 0x7F;
+
+	    e->attr &= ~TATTR_URLMASK;
+
+	    if (ignore_uchar(d->chr)) {
+		continue;
+	    }
+
+	    if (!DIRECT_CHAR(d->chr) || (d->chr & 0x80)) {
+		state = 0;
+		continue;
+	    }
+
+	    if (state < 0) {
+		if (url_char[c]) {
+		    e->attr |= (unsigned long long)link << TATTR_URLSHIFT;
+		    e->attr |= ATTR_INVALID;
+		} else {
+		    state = 0;
+		    link++;
+		}
+		continue;
+	    }
+
+	    state = url_header(c, state);
+	    // https://
+	    // http://
+	    // 0123456789
+	    // 123456789
+	    if (state == 1) {
+		start = j;
+	    }
+	    if (state == 8) {
+		int k;
+		for (k = (start < j) ? start : 0; k <= j; k++) {
+		    termchar *dd = lchars + k;
+		    termchar *ee = ldisp + k;
+		    if (ignore_uchar(dd->chr)) {
+			continue;
+		    }
+		    ee->attr |= (unsigned long long)link << TATTR_URLSHIFT;
+		    ee->attr |= ATTR_INVALID;
+		}
+		if (start > j) {
+		    termline *lldata = lineptr(i - 1 + term->disptop);
+		    termchar *lldisp = term->disptext[i-1]->chars;
+		    for (k = start; k < term->cols; k++) {
+			termchar *dd = lldata->chars + k;
+			termchar *ee = lldisp + k;
+			if (ignore_uchar(dd->chr)) {
+			    continue;
+			}
+			ee->attr |= (unsigned long long)link << TATTR_URLSHIFT;
+			ee->attr |= ATTR_INVALID;
+		    }
+		    unlineptr(lldata);
+		}
+		state = -1;
+	    }
+	}
+	unlineptr(ldata);
+    }
+}
+
 /*
  * Given a context, update the window. Out of paranoia, we don't
  * allow WM_PAINT responses to do scrolling optimisations.
@@ -4769,12 +4978,18 @@ static void do_paint(Terminal *term, Context ctx, int may_optimise)
     term->scrollhead = term->scrolltail = NULL;
 #endif /* OPTIMISE_SCROLL */
 
+    /* Hyperlink */
+    if (term->cfg.url_enable) {
+	find_url(term);
+    }
+
     /* The normal screen data */
     for (i = 0; i < term->rows; i++) {
 	termline *ldata;
 	termchar *lchars;
 	int dirty_line, dirty_run, selected;
-	unsigned long attr = 0, cset = 0;
+	unsigned long long attr = 0;
+	unsigned long cset = 0;
 	int start = 0;
 	int ccount = 0;
 	int last_run_dirty = 0;
@@ -4798,7 +5013,8 @@ static void do_paint(Terminal *term, Context ctx, int may_optimise)
 	 * each character cell to look like.
 	 */
 	for (j = 0; j < term->cols; j++) {
-	    unsigned long tattr, tchar;
+	    unsigned long tchar;
+	    unsigned long long tattr;
 	    termchar *d = lchars + j;
 	    scrpos.x = backward ? backward[j] : j;
 
@@ -4917,6 +5133,10 @@ static void do_paint(Terminal *term, Context ctx, int may_optimise)
 
 	    if (dirtyrect)
 		term->disptext[i]->chars[j].attr |= ATTR_INVALID;
+
+	    /* hyperlink */
+	    newline[j].attr |=
+		term->disptext[i]->chars[j].attr & TATTR_URLMASK;
 	}
 
 	/*
@@ -4927,7 +5147,8 @@ static void do_paint(Terminal *term, Context ctx, int may_optimise)
 	term->disptext[i]->lattr = ldata->lattr;
 
 	for (j = 0; j < term->cols; j++) {
-	    unsigned long tattr, tchar;
+	    unsigned long tchar;
+	    unsigned long long tattr;
 	    int break_run, do_copy;
 	    termchar *d = lchars + j;
 
@@ -5193,7 +5414,7 @@ static void clipme(Terminal *term, pos top, pos bottom, int rect, int desel)
 {
     clip_workbuf buf;
     int old_top_x;
-    int attr;
+    unsigned long long attr;
 
     buf.buflen = 5120;			
     buf.bufpos = 0;
@@ -5265,6 +5486,15 @@ static void clipme(Terminal *term, pos top, pos bottom, int rect, int desel)
 		int uc = ldata->chars[x].chr;
                 attr = ldata->chars[x].attr;
 
+		/* Ignore Chars */
+		if (ignore_uchar(uc)) {
+		  if (ldata->chars[x].cc_next) {
+		    x += ldata->chars[x].cc_next;
+		    continue;
+		  }
+		  break;
+		}
+ 
 		switch (uc & CSET_MASK) {
 		  case CSET_LINEDRW:
 		    if (!term->cfg.rawcnp) {
@@ -5846,6 +6076,79 @@ void term_mouse(Terminal *term, Mouse_Button braw, Mouse_Button bcooked,
 	    term->selend.y =   max(term->selanchor.y, selpoint.y);
 	}
 	sel_spread(term);
+    } else if (bcooked == MBT_SELECT && a == MA_RELEASE &&
+	       term->selstate == ABOUT_TO &&
+	       (!term->cfg.url_ctrl_click || ctrl)) {
+	/* Hyperlink */
+	int sx = 0;
+	int sy = 0;
+	int cx = x;
+	int cy = y;
+	int i, j;
+	char *wbuff;
+	char *wp;
+
+	deselect(term);
+	term->selstate = NO_SELECTION;
+
+	/* find start point */
+	for (i = cy; i >= 0; i--) {
+	    termline *ldata = lineptr(term->disptop + i);
+	    termchar *lchars = ldata->chars;
+	    termchar *ldisp = term->disptext[i]->chars;
+	    for (j = cx; j >= 0; j--) {
+		if (ignore_uchar((lchars + j)->chr)) {
+		    continue;
+		}
+		if (!((ldisp + j)->attr & TATTR_URLMASK)) {
+		    if ((j == x) && (i == y)) {
+			unlineptr(ldata);
+			return;
+		    }
+		    j++;
+		    if (j == term->cols) {
+			sx = 0;
+			sy = i + 1;
+		    } else {
+			sx = j;
+			sy = i;
+		    }
+		    unlineptr(ldata);
+		    goto found;
+		}
+	    }
+	    cx = term->cols - 1;
+	    unlineptr(ldata);
+	}
+
+    found:
+	wbuff = snewn(term->cols * (term->rows - sy) + 1, char);
+	wp = wbuff;
+
+	for (i = sy; i <= term->rows; i++) {
+	    termline *ldata = lineptr(term->disptop + i);
+	    termchar *lchars = ldata->chars;
+	    termchar *ldisp = term->disptext[i]->chars;
+	    for (j = sx; j < term->cols; j++) {
+		if (ignore_uchar((lchars + j)->chr)) {
+		    continue;
+		}
+		if (!((ldisp + j)->attr & TATTR_URLMASK)) {
+		    unlineptr(ldata);
+		    goto exec;
+		} else {
+		    *wp = (lchars + j)->chr & 0x7f;
+		    wp++;
+		}
+	    }
+	    sx = 0;
+	    unlineptr(ldata);
+	}
+
+    exec:
+	*wp = 0;
+	exec_browser(wbuff);
+	sfree(wbuff);
     } else if ((bcooked == MBT_SELECT || bcooked == MBT_EXTEND) &&
 	       a == MA_RELEASE) {
 	if (term->selstate == DRAGGING) {

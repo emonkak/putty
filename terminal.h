@@ -39,7 +39,7 @@ struct termchar {
      * saying FULL-TERMCHAR.
      */
     unsigned long chr;
-    unsigned long attr;
+    unsigned long long attr;
 
     /*
      * The cc_next field is used to link multiple termchars
@@ -273,6 +273,9 @@ struct terminal_tag {
     int wcFromTo_size;
     struct bidi_cache_entry *pre_bidi_cache, *post_bidi_cache;
     int bidi_cache_size;
+
+    unsigned long ignore_uchars[IGNORE_CHARS_MAX + 1];
+    int ignore_length;
 };
 
 #define in_utf(term) ((term)->utf || (term)->ucsdata->line_codepage==CP_UTF8)

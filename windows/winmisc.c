@@ -132,6 +132,11 @@ HMODULE load_system32_dll(const char *libname)
     return ret;
 }
 
+void exec_browser(char *url)
+{
+    ShellExecute(NULL, NULL, url, NULL, NULL, SW_SHOWNORMAL);
+}
+
 #ifdef DEBUG
 static FILE *debug_fp = NULL;
 static HANDLE debug_hdl = INVALID_HANDLE_VALUE;

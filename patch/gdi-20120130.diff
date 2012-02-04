@@ -1,6 +1,20 @@
-diff -r a5f2d327e10f -r 69d8bf45f3db Recipe
---- a/Recipe	Thu Dec 29 18:30:44 2011 +0900
-+++ b/Recipe	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 LICENCE
+--- a/LICENCE	Thu Jan 12 20:53:35 2012 +0900
++++ b/LICENCE	Mon Jan 30 23:51:03 2012 +0900
+@@ -3,7 +3,9 @@
+ Portions copyright Robert de Bath, Joris van Rantwijk, Delian
+ Delchev, Andreas Schultz, Jeroen Massar, Wez Furlong, Nicolas Barry,
+ Justin Bradford, Ben Harris, Malcolm Smith, Ahmad Khalifa, Markus
+-Kuhn, Colin Watson, and CORE SDI S.A.
++Markus Kuhn, Colin Watson, CORE SDI S.A., warp13,
++Hideki EIRAKU, Ëõ≠Â≠êÂ±ã ÂèåÂÖ≠, Yoshida Masato,
++and MATSUI Nag.
+ 
+ Permission is hereby granted, free of charge, to any person
+ obtaining a copy of this software and associated documentation files
+diff -r b9dfa96f2b06 -r 6555bf286954 Recipe
+--- a/Recipe	Thu Jan 12 20:53:35 2012 +0900
++++ b/Recipe	Mon Jan 30 23:51:03 2012 +0900
 @@ -194,6 +194,8 @@
  !forceobj psftp.res
  !forceobj pageant.res
@@ -10,7 +24,13 @@ diff -r a5f2d327e10f -r 69d8bf45f3db Recipe
  
  # `make install' target for Unix.
  !begin gtk
-@@ -258,6 +260,7 @@
+@@ -253,11 +255,13 @@
+ 
+ # Same thing on Unix.
+ UXTERM   = TERMINAL uxcfg sercfg uxucs uxprint timing
++         + uxl10n
+ GTKTERM  = UXTERM gtkwin gtkcfg gtkdlg gtkfont gtkcols xkeysym
+ OSXTERM  = UXTERM osxwin osxdlg osxctrls
  
  # Non-SSH back ends (putty, puttytel, plink).
  NONSSH   = telnet raw rlogin ldisc pinger
@@ -18,7 +38,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db Recipe
  
  # SSH back end (putty, plink, pscp, psftp).
  SSH      = ssh sshcrc sshdes sshmd5 sshrsa sshrand sshsha sshblowf
-@@ -284,6 +287,7 @@
+@@ -284,6 +288,7 @@
  # Standard libraries.
  LIBS     = advapi32.lib user32.lib gdi32.lib comctl32.lib comdlg32.lib
           + shell32.lib winmm.lib imm32.lib winspool.lib ole32.lib
@@ -26,58 +46,72 @@ diff -r a5f2d327e10f -r 69d8bf45f3db Recipe
  
  # Network backend sets. This also brings in the relevant attachment
  # to proxy.c depending on whether we're crypto-avoidant or not.
-@@ -305,22 +309,35 @@
+@@ -305,26 +310,40 @@
  # X/GTK Unix app, [U] for command-line Unix app.
  
  putty    : [G] GUITERM NONSSH WINSSH W_BE_ALL WINMISC winx11 putty.res LIBS
-+         + l10n
++         + winl10n
  puttytel : [G] GUITERM NONSSH W_BE_NOSSH WINMISC puttytel.res nogss LIBS
-+         + l10n
++         + winl10n
  plink    : [C] winplink wincons NONSSH WINSSH W_BE_ALL logging WINMISC
           + winx11 plink.res winnojmp LIBS
-+         + l10ndummy
++         + winl10ndummy
 +plinkw   : [G] winplinkw winconsw NONSSH WINSSH W_BE_ALL logging WINMISC
 +         + winx11 plinkw.res winnojmp LIBS
-+         + l10n
++         + winl10n
  pscp     : [C] pscp winsftp wincons WINSSH BE_SSH SFTP wildcard WINMISC
           + pscp.res winnojmp LIBS
-+         + l10ndummy
++         + winl10ndummy
  psftp    : [C] psftp winsftp wincons WINSSH BE_SSH SFTP wildcard WINMISC
           + psftp.res winnojmp LIBS
-+         + l10ndummy
++         + winl10ndummy
  
  pageant  : [G] winpgnt sshrsa sshpubk sshdes sshbn sshmd5 version tree234
           + misc sshaes sshsha winpgntc sshdss sshsh256 sshsh512 winutils
           + winmisc winhelp pageant.res LIBS
-+         + l10n
++         + winl10n
  
  puttygen : [G] winpgen sshrsag sshdssg sshprime sshdes sshbn sshmd5 version
           + sshrand winnoise sshsha winstore misc winctrls sshrsa sshdss winmisc
           + sshpubk sshaes sshsh256 sshsh512 import winutils puttygen.res
  	 + tree234 notiming winhelp winnojmp LIBS wintime
-+	 + l10n iso2022 wcwidth
++	 + winl10n iso2022 wcwidth
 +
 +pfwd     : [G] pfwd wincons2 NONSSH WINSSH W_BE_ALL logging WINMISC
-+         + winx11 pfwd.res winnojmp LIBS l10n
++         + winx11 pfwd.res winnojmp LIBS winl10n
  
  pterm    : [X] GTKTERM uxmisc misc ldisc settings uxpty uxsel BE_NONE uxstore
           + uxsignal CHARSET cmdline uxpterm version time xpmpterm xpmptcfg
-diff -r a5f2d327e10f -r 69d8bf45f3db config.c
---- a/config.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/config.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -351,7 +351,10 @@
- 	int i;
+ 	 + nogss
++         + iso2022
+ putty    : [X] GTKTERM uxmisc misc ldisc settings uxsel U_BE_ALL uxstore
+          + uxsignal CHARSET uxputty NONSSH UXSSH UXMISC ux_x11 xpmputty
+          + xpmpucfg
+diff -r b9dfa96f2b06 -r 6555bf286954 cmdgen.c
+--- a/cmdgen.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/cmdgen.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -262,7 +262,7 @@
+     char *outfile = NULL, *outfiletmp = NULL;
+     Filename outfilename;
+     enum { PRIVATE, PUBLIC, PUBLICO, FP, OPENSSH, SSHCOM } outtype = PRIVATE;
+-    int bits = 1024;
++    int bits = 2048;
+     char *comment = NULL, *origcomment = NULL;
+     int change_passphrase = FALSE;
+     int errs = FALSE, nogo = FALSE;
+diff -r b9dfa96f2b06 -r 6555bf286954 config.c
+--- a/config.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/config.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -352,6 +352,8 @@
  	const char *cp, *thiscp;
  	dlg_update_start(ctrl, dlg);
--	thiscp = cp_name(decode_codepage(cfg->line_codepage));
-+	if (decode_codepage (cfg->line_codepage) != CP_UTF8 || iso2022_init_test (cfg->line_codepage))
-+	    thiscp = cp_name(decode_codepage(cfg->line_codepage));
-+	else
+ 	thiscp = cp_name(decode_codepage(cfg->line_codepage));
++	if (decode_codepage (cfg->line_codepage) == CP_UTF8 && !iso2022_init_test (cfg->line_codepage))
 +	    thiscp = cfg->line_codepage;
  	dlg_listbox_clear(ctrl, dlg);
  	for (i = 0; (cp = cp_enumerate(i)) != NULL; i++)
  	    dlg_listbox_add(ctrl, dlg, cp);
-@@ -361,6 +364,7 @@
+@@ -361,6 +363,7 @@
      } else if (event == EVENT_VALCHANGE) {
  	dlg_editbox_get(ctrl, dlg, cfg->line_codepage,
  			sizeof(cfg->line_codepage));
@@ -85,7 +119,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db config.c
  	strcpy(cfg->line_codepage,
  	       cp_name(decode_codepage(cfg->line_codepage)));
      }
-@@ -646,7 +650,8 @@
+@@ -646,7 +649,8 @@
      "ANSI Blue", "ANSI Blue Bold",
      "ANSI Magenta", "ANSI Magenta Bold",
      "ANSI Cyan", "ANSI Cyan Bold",
@@ -95,7 +129,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db config.c
  };
  
  static void colour_handler(union control *ctrl, void *dlg,
-@@ -1683,6 +1688,14 @@
+@@ -1683,6 +1687,14 @@
      ccd->button->generic.column = 1;
      ctrl_columns(s, 1, 100);
  
@@ -110,7 +144,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db config.c
      /*
       * The Window/Colours panel.
       */
-@@ -1728,6 +1741,28 @@
+@@ -1728,6 +1740,28 @@
      cd->button->generic.column = 1;
      ctrl_columns(s, 1, 100);
  
@@ -139,9 +173,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db config.c
      /*
       * The Connection panel. This doesn't show up if we're in a
       * non-network utility such as pterm. We tell this by being
-diff -r a5f2d327e10f -r 69d8bf45f3db dialog.c
---- a/dialog.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/dialog.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 dialog.c
+--- a/dialog.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/dialog.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -132,7 +132,7 @@
      int index = ctrl_find_set(b, path, 1);
      s->pathname = dupstr(path);
@@ -275,9 +309,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db dialog.c
      c->checkbox.shortcut = shortcut;
      return c;
  }
-diff -r a5f2d327e10f -r 69d8bf45f3db doc/config.but
---- a/doc/config.but	Thu Dec 29 18:30:44 2011 +0900
-+++ b/doc/config.but	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 doc/config.but
+--- a/doc/config.but	Thu Jan 12 20:53:35 2012 +0900
++++ b/doc/config.but	Mon Jan 30 23:51:03 2012 +0900
 @@ -1392,6 +1392,13 @@
  This option can easily be inconvenient, so by default it is
  disabled.
@@ -292,17 +326,161 @@ diff -r a5f2d327e10f -r 69d8bf45f3db doc/config.but
  \S{config-mouse} Changing the actions of the mouse buttons
  
  \cfg{winhelp-topic}{selection.buttons}
-diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
+diff -r b9dfa96f2b06 -r 6555bf286954 iso2022.c
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/iso2022.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -0,0 +1,1894 @@
-+#include <winsock2.h>
-+#include <windows.h>
++++ b/iso2022.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -0,0 +1,2014 @@
 +#include <string.h>
 +#include "putty.h"
 +#include "iso2022.h"
 +
++#define strlenu(s) strlen ((char *)s)
++
 +int iso2022_win95flag;
++
++#ifdef _WINDOWS
++#define UCS2CHAR WCHAR
++
++static int
++get_win95flag (void)
++{
++  OSVERSIONINFO ovi;
++
++  ovi.dwOSVersionInfoSize = sizeof ovi;
++  GetVersionEx (&ovi);
++  return ovi.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS;
++}
++
++static int
++wchar_to_utf8 (UCS2CHAR *src, unsigned char *dest, int destlen, BOOL *err)
++{
++  return WideCharToMultiByte (CP_UTF8, 0, src, -1, (char *)dest, destlen, 0,
++			      err);
++}
++
++static int
++wchar_to_cp932 (UCS2CHAR *src, unsigned char *dest, int destlen, BOOL *err)
++{
++  return WideCharToMultiByte (932, 0, src, -1, (char *)dest, destlen, 0, err);
++}
++
++static int
++wchar_to_cp950 (UCS2CHAR *src, unsigned char *dest, int destlen, BOOL *err)
++{
++  return WideCharToMultiByte (950, 0, src, -1, (char *)dest, destlen, 0, err);
++}
++
++static void
++utf8_to_wchar (unsigned char *src, UCS2CHAR *dest, int destlen)
++{
++  MultiByteToWideChar (CP_UTF8, 0, (char *)src, -1, dest, destlen);
++}
++
++static void
++cp932_to_wchar (unsigned char *src, UCS2CHAR *dest, int destlen)
++{
++  MultiByteToWideChar (932, 0, (char *)src, -1, dest, destlen);
++}
++
++static void
++cp950_to_wchar (unsigned char *src, UCS2CHAR *dest, int destlen)
++{
++  MultiByteToWideChar (950, 0, (char *)src, -1, dest, destlen);
++}
++#else
++#include <iconv.h>
++#include <stdlib.h>
++#define BOOL int
++#define UCS2CHAR uint16_t
++
++static int
++get_win95flag (void)
++{
++  return 0;
++}
++
++static int
++call_iconv (const char *fromcode, char *src, size_t srclen,
++	    const char *tocode, char *dest, int destlen, int to_w, BOOL *err)
++{
++  iconv_t cd;
++  size_t outbytesleft;
++
++  outbytesleft = destlen - 1;
++  if (to_w)
++    outbytesleft--;
++  cd = iconv_open (tocode, fromcode);
++  if (cd == (iconv_t)-1)
++    {
++      char msg[100];
++
++      snprintf (msg, 100, "iconv_open (\"%s\", \"%s\")", tocode, fromcode);
++      perror (msg);
++      exit (1);
++    }
++  if (err)
++    *err = 0;
++  if (iconv (cd, &src, &srclen, &dest, &outbytesleft) == -1 && err)
++    *err = 1;
++  iconv_close (cd);
++  *dest++ = 0;
++  if (to_w)
++    *dest++ = 0;
++  return destlen - outbytesleft;
++}
++
++static int
++wchar_to_utf8 (UCS2CHAR *src, unsigned char *dest, int destlen, BOOL *err)
++{
++  size_t srclen;
++
++  for (srclen = 0; src[srclen] != 0; srclen++);
++  return call_iconv ("UCS-2LE", (char *)src, srclen * 2,
++		     "UTF-8", (char *)dest, destlen, 0, err);
++}
++
++static int
++wchar_to_cp932 (UCS2CHAR *src, unsigned char *dest, int destlen, BOOL *err)
++{
++  size_t srclen;
++
++  for (srclen = 0; src[srclen] != 0; srclen++);
++  return call_iconv ("UCS-2LE", (char *)src, srclen * 2,
++		     "MS_KANJI", (char *)dest, destlen, 0, err);
++}
++
++static int
++wchar_to_cp950 (UCS2CHAR *src, unsigned char *dest, int destlen, BOOL *err)
++{
++  size_t srclen;
++
++  for (srclen = 0; src[srclen] != 0; srclen++);
++  return call_iconv ("UCS-2LE", (char *)src, srclen * 2,
++		     "CP950", (char *)dest, destlen, 0, err);
++}
++
++static void
++utf8_to_wchar (unsigned char *src, UCS2CHAR *dest, int destlen)
++{
++  call_iconv ("UTF-8", (char *)src, strlen ((char *)src),
++	      "UCS-2LE", (char *)dest, destlen * 2, 1, NULL);
++}
++
++static void
++cp932_to_wchar (unsigned char *src, UCS2CHAR *dest, int destlen)
++{
++  /* "MS_KANJI" is better than "CP932" for avoiding mojibake. */
++  call_iconv ("MS_KANJI", (char *)src, strlen ((char *)src),
++	      "UCS-2LE", (char *)dest, destlen * 2, 1, NULL);
++}
++
++static void
++cp950_to_wchar (unsigned char *src, UCS2CHAR *dest, int destlen)
++{
++  call_iconv ("CP950", (char *)src, strlen ((char *)src),
++	      "UCS-2LE", (char *)dest, destlen * 2, 1, NULL);
++}
++#endif
 +
 +static int
 +buflen (struct iso2022struct *p)
@@ -359,13 +537,14 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +}
 +
 +int
-+iso2022_width (struct iso2022_data *this, wchar_t c)
++iso2022_width_sub (struct iso2022_data *this, wchar_t c)
 +{
 +  if (this->rcv.width == 0)
 +    {
-+      if (this->rcv.gr->type == UTF8CJK) return mk_wcwidth_cjk (c);
-+      /* else if (this->rcv.gr->type == UTF8CJKL) return this->rcv.width == 1 ? mk_wcwidth_cjk (c) : mk_wcwidth (c); */
-+      else if (this->rcv.gr->type == UTF8NONCJK) return mk_wcwidth (c);
++      if (this->rcv.gr->type == UTF8CJK)
++	return -1;
++      else if (this->rcv.gr->type == UTF8NONCJK)
++	return -2;
 +      return 1;			/* This shouldn't happen */
 +    }
 +  else
@@ -504,8 +683,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +static void
 +translate (struct iso2022struct *q, struct g *p)
 +{
-+  WCHAR buf2[100];
-+  int i;
++  UCS2CHAR buf2[100];
 +
 +  q->buflen = 0;
 +  q->width = p->len;
@@ -514,8 +692,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +    case US_ASCII:
 +      buf2[0] = q->buf[0] & 0x7f;
 +      buf2[1] = 0;
-+      q->buflen = WideCharToMultiByte
-+	(CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0);
++      q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL);
 +      if (q->buflen)
 +	q->buflen--;
 +      break;
@@ -524,8 +701,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +      buf2[1] = 0;
 +      if (buf2[0] == 0x5c) buf2[0] = 0xa5;
 +      if (buf2[0] == 0x7e) buf2[0] = 0x203e;
-+      q->buflen =
-+	WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0);
++      q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL);
 +      if (q->buflen)
 +	q->buflen--;
 +      break;
@@ -533,13 +709,12 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +      buf2[0] = q->buf[0] & 0x7f;
 +      buf2[0] += 0xff40;
 +      buf2[1] = 0;
-+      q->buflen =
-+	WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0);
++      q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL);
 +      if (q->buflen)
 +	q->buflen--;
 +      break;
 +#define A(a) q->buf[0] &= 0x7f; buf2[0] = q->buf[0] >= 0x20 ? a[q->buf[0] - 0x20] : 0; buf2[1] = 0; \
-+q->buflen = WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0); \
++q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL); \
 +if (q->buflen) q->buflen--;
 +    case ISO8859_1: A(iso_8859_1); break;
 +    case ISO8859_2: A(iso_8859_2); break;
@@ -572,21 +747,22 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +      q->buf[0] &= 0x7f; buf2[0] = q->buf[0] >= 0x20 ? q->buf[0] : 0;
 +      if (q->buf[0] >= 0x60 && q->buf[0] <= 0x7f)
 +        buf2[0] = unitab_xterm_std[q->buf[0] - 0x60];
-+      q->buflen = WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0);
++      q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL);
 +      if (q->buflen) q->buflen--;
 +      break;
 +#undef A
 +#define A(a) q->buf[0] &= 0x7f;q->buf[1] &= 0x7f;q->buflen = 0; \
 +if (q->buf[0] >= 0x21 && q->buf[0] <= 0x7e && q->buf[1] >= 0x21 && q->buf[1] <= 0x7e) \
 +{buf2[0] = a[q->buf[0] - 0x21][q->buf[1] - 0x21];buf2[1] = 0; \
-+q->buflen = WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0); \
++q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL); \
 +if (q->buflen)q->buflen--;}
++/* This is a workaround for wave dash problem */
 +#define B(a) if((q->buf[0]&0x7f)>=0x30){A(a);}else{ \
 +q->buf[0]&=0x7f;q->buf[1]&=0x7f;q->buf[2]=q->buf[0]-0x21; \
 +q->buf[3]=q->buf[1]-0x21+((q->buf[2]%2)?94:0)+64; \
 +q->buf[0]=q->buf[2]/2+129;q->buf[1]=q->buf[3]+((q->buf[3]>=0x7f)?1:0); \
-+q->buf[2]=0;MultiByteToWideChar(932,0,q->buf,-1,buf2,100); \
-+q->buflen = WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0); \
++q->buf[2]=0; cp932_to_wchar (q->buf, buf2, 100); \
++q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL); \
 +if (q->buflen)q->buflen--;}
 +    case JISC6226_1978: B(jisc6226_1978); break;
 +    case JISX0208_1983: B(jisx0208_1983); break;
@@ -609,16 +785,14 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +    case MS_KANJI:
 +      q->width = (q->buf[0] >= 160 && q->buf[0] < 224) ? 1 : 2;
 +      q->buf[q->width] = 0;
-+      MultiByteToWideChar (932, 0, q->buf, -1, buf2, 100);
-+      q->buflen =
-+	WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0);
++      cp932_to_wchar (q->buf, buf2, 100);
++      q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL);
 +      break;
 +    case BIG5:
 +      q->width = 2;
 +      q->buf[q->width] = 0;
-+      MultiByteToWideChar (950, 0, q->buf, -1, buf2, 100);
-+      q->buflen =
-+	WideCharToMultiByte (CP_UTF8, 0, buf2, -1, q->buf, 100, 0, 0);
++      cp950_to_wchar (q->buf, buf2, 100);
++      q->buflen = wchar_to_utf8 (buf2, q->buf, 100, NULL);
 +      break;
 +    case UTF8CJK:
 +    case UTF8NONCJK:
@@ -628,25 +802,10 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +    }
 +  if (!q->buflen)
 +    {
-+      int j;
-+
-+      for (i = j = 0; i < p->len && i < 2; i++)
-+	{
-+#if 0
-+	  buf2[0] = 0xd900 | 'a'; /* UCSERR */
-+	  q->buf[j + 3] = 0;
-+	  q->buf[j + 2] = 0x80 | (buf2[0] & 0x3f), buf2[0] >>= 6;
-+	  q->buf[j + 1] = 0x80 | (buf2[0] & 0x3f), buf2[0] >>= 6;
-+	  q->buf[j + 0] = 0xe0 | (buf2[0] & 0xf);
-+	  j += 4;
-+#else
-+	  q->buf[j] = '?';
-+	  j++;
-+#endif
-+	}
-+      q->buf[j] = 0;
-+      q->buflen = j;
-+      q->width = 1;
++      q->buf[0] = '?';
++      q->buf[1] = 0;
++      q->buflen = 1;
++      q->width = p->len;
 +    }
 +  q->bufoff = 0;
 +  if (q->ssl)
@@ -654,7 +813,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +}
 +
 +static int
-+try0 (struct g *p, WCHAR buf2, unsigned char *buf)
++try0 (struct g *p, UCS2CHAR buf2, unsigned char *buf)
 +{
 +  int i, j;
 +
@@ -707,8 +866,8 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +#undef A
 +#define A(a) for(j=94,i=0;i<94&&j==94;i++)for(j=0;j<94;j++)if(a[i][j]==buf2)break; \
 +if(j!=94){buf[0]=i+0x20;buf[1]=j+0x21;buf[2]=0;return 1;}
-+#define B {WCHAR a[]={buf2,0};BOOL b; \
-+ WideCharToMultiByte(932,0,a,-1,buf,5,0,&b); \
++#define B {UCS2CHAR a[]={buf2,0};BOOL b; \
++ wchar_to_cp932 (a, buf, 5, &b); \
 + if (buf[0]<129||buf[0]>=0xf0||(buf[0]>=160&&buf[0]<224))return 0; \
 + if(!b){if(buf[0]>=224)buf[0]-=224-160;buf[0]-=129;if(buf[1]>=0x7f)buf[1]--; \
 + buf[1]-=64;buf[0]=buf[0]*2+(buf[1]>=94);if(buf[1]>=94)buf[1]-=94;buf[2]=0; \
@@ -732,20 +891,20 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +    case KSC5601_1987: A(ksc5601_1987); break;
 +    case MS_KANJI:
 +      {
-+	WCHAR a[] = { buf2, 0 };
++	UCS2CHAR a[] = { buf2, 0 };
 +	BOOL b;
 +
-+	WideCharToMultiByte (932, 0, a, -1, buf, 5, 0, &b);
++	wchar_to_cp932 (a, buf, 5, &b);
 +	if (!b)
 +	  return 1;
 +      }
 +      break;
 +    case BIG5:
 +      {
-+	WCHAR a[] = { buf2, 0 };
++	UCS2CHAR a[] = { buf2, 0 };
 +	BOOL b;
 +
-+	WideCharToMultiByte (950, 0, a, -1, buf, 5, 0, &b);
++	wchar_to_cp950 (a, buf, 5, &b);
 +	if (!b)
 +	  return 1;
 +      }
@@ -1008,21 +1167,17 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +      q->esc = 1;
 +      goto pass;
 +    pass:			/* pass through the buffer */
-+      /* if (q->gr->type == UTF8CJKL && q->width == 2 && q->buf[0] == 0x0a)
-+	q->width = 1; */
 +      q->buf[q->buflen = q->bufoff] = 0;
 +      q->bufoff = 0;
 +      break;
 +    cont:		       /* parse after the next byte arrived */
 +      break;
 +    clear:			/* clear the buffer */
-+      /* if (q->gr->type == UTF8CJKL)
-+	q->width = 2; */
 +      q->bufoff = 0;
 +      break;
 +    err:			/* broken input */
-+      q->ins = "??";
-+      q->insw = "\1\1";
++      q->ins = (unsigned char *)"??";
++      q->insw = (unsigned char *)"\1\1";
 +      q->inslen = (err_width > 2) ? 2 : err_width;
 +      if (q->bufoff >= 2)
 +	{
@@ -1043,7 +1198,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +}
 +
 +static int
-+try1 (struct iso2022struct *q, WCHAR buf2, unsigned char *p,
++try1 (struct iso2022struct *q, UCS2CHAR buf2, unsigned char *p,
 +      unsigned char *designate, unsigned char *invoke,
 +      unsigned char *beforec0, int bits)
 +{
@@ -1064,7 +1219,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +}
 +
 +static int
-+try2 (struct iso2022struct *q, WCHAR buf2, unsigned char *p,
++try2 (struct iso2022struct *q, UCS2CHAR buf2, unsigned char *p,
 +      unsigned char *designate, unsigned char *invoke,
 +      unsigned char *beforec0, int bits)
 +{
@@ -1098,7 +1253,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +}
 +
 +static int
-+try3 (struct iso2022struct *q, WCHAR buf2, unsigned char *p,
++try3 (struct iso2022struct *q, UCS2CHAR buf2, unsigned char *p,
 +      unsigned char *designate, unsigned char *invoke,
 +      unsigned char *beforec0, int bits)
 +{
@@ -1132,7 +1287,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +}
 +
 +static int
-+try4 (struct iso2022struct *q, WCHAR buf2, unsigned char *p,
++try4 (struct iso2022struct *q, UCS2CHAR buf2, unsigned char *p,
 +      unsigned char *designate, unsigned char *invoke,
 +      unsigned char *beforec0, int bits)
 +{
@@ -1175,30 +1330,30 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +      (q->bufoff == 5 && (q->buf[0] & 0xfc) == 0xf8) ||
 +      (q->bufoff == 6 && (q->buf[0] & 0xfe) == 0xfc))
 +    {
-+      WCHAR buf2[100];
++      UCS2CHAR buf2[100];
 +      unsigned char *p1, *p2, *p3, *p4, buf3[100];
 +      int bits;
 +
 +      p1 = this->initstring;
-+      p1 += strlen (p1) + 1;
-+      p1 += strlen (p1) + 1;
++      p1 += strlenu (p1) + 1;
++      p1 += strlenu (p1) + 1;
 +      p2 = p1;
-+      while (strlen (p2))
-+	p2 += strlen (p2) + 1;
++      while (strlenu (p2))
++	p2 += strlenu (p2) + 1;
 +      p2++;
 +      p3 = p2;
-+      while (strlen (p3))
-+	p3 += strlen (p3) + 1;
++      while (strlenu (p3))
++	p3 += strlenu (p3) + 1;
 +      p3++;
 +      p4 = p3;
-+      while (strlen (p4))
-+	p4 += strlen (p4) + 1;
++      while (strlenu (p4))
++	p4 += strlenu (p4) + 1;
 +      p4++;
 +      bits = *p4;
 +      if (q->buf[0] >= 0x20 && q->buf[0] != 0x7f)
 +	{
 +	  q->buf[q->bufoff] = 0;
-+	  MultiByteToWideChar (CP_UTF8, 0, q->buf, -1, buf2, 100);
++	  utf8_to_wchar (q->buf, buf2, 100);
 +	  for (;;)
 +	    {
 +	      if (!try1 (q, buf2[0], buf3, p1, p2, p3, bits))
@@ -1216,8 +1371,8 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +		      }
 +	      break;
 +	    }
-+	  strcpy (q->buf, buf3);
-+	  q->buflen = strlen (q->buf);
++	  strcpy ((char *)q->buf, (char *)buf3);
++	  q->buflen = strlenu (q->buf);
 +	  q->bufoff = 0;
 +	}
 +      else
@@ -1247,7 +1402,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +	    }
 +	  *pp++ = c;
 +	  *pp = 0;
-+	  q->buflen = strlen (q->buf);
++	  q->buflen = strlenu (q->buf);
 +	  q->bufoff = 0;
 +	  if (!c)
 +	    q->buflen++;
@@ -1269,15 +1424,15 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +      unsigned char *p1, *p2, *p3;
 +
 +      p1 = this->initstring;
-+      p1 += strlen (p1) + 1;
-+      p1 += strlen (p1) + 1;
++      p1 += strlenu (p1) + 1;
++      p1 += strlenu (p1) + 1;
 +      p2 = p1;
-+      while (strlen (p2))
-+	p2 += strlen (p2) + 1;
++      while (strlenu (p2))
++	p2 += strlenu (p2) + 1;
 +      p2++;
 +      p3 = p2;
-+      while (strlen (p3))
-+	p3 += strlen (p3) + 1;
++      while (strlenu (p3))
++	p3 += strlenu (p3) + 1;
 +      p3++;
 +        {
 +	  struct iso2022struct saveq;
@@ -1304,7 +1459,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +	    }
 +	  *pp++ = c;
 +	  *pp = 0;
-+	  q->buflen = strlen (q->buf);
++	  q->buflen = strlenu (q->buf);
 +	  q->bufoff = 0;
 +	  if (!c)
 +	    q->buflen++;
@@ -1703,48 +1858,45 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +int
 +iso2022_init (struct iso2022_data *this, char *p, int mode)
 +{
-+  int i, f, j, k;
++  int i, f, j, k = 0;
 +  int tmp_lockgr, tmp_mskanji, tmp_big5, tmp_win95flag, tmp_ssgr, tmp_utf8cjk;
 +  int tmp_utf8noncjk, tmp_autojp_eucjp, tmp_autojp_mskanji, tmp_autojp_utf8;
 +  unsigned char *init_string = this->initstring;
 +
-+  if (!lstrcmpi (p, "euc-jp"))
++  if (!stricmp (p, "euc-jp"))
 +    p = "iso2022 lockgr euc-jp";
-+  else if (!lstrcmpi (p, "iso-2022-jp"))
++  else if (!stricmp (p, "iso-2022-jp"))
 +    p = "iso2022 "
 +      "1b28420f00 1b28420f00 1b2842001b2442001b2428440000 00 1b28420000 07";
-+  else if (!lstrcmpi (p, "MS_Kanji") || !lstrcmpi (p, "Shift_JIS"))
++  else if (!stricmp (p, "MS_Kanji") || !stricmp (p, "Shift_JIS"))
 +    p = "iso2022 lockgr MS_Kanji";
-+  else if (!lstrcmpi (p, "big5"))
++  else if (!stricmp (p, "big5"))
 +    p = "iso2022 lockgr big5";
-+  else if (!lstrcmpi (p, "euc-kr"))
++  else if (!stricmp (p, "euc-kr"))
 +    p = "iso2022 lockgr euc-kr";
-+  else if (!lstrcmpi (p, "euc-cn"))
++  else if (!stricmp (p, "euc-cn"))
 +    p = "iso2022 lockgr euc-cn";
-+  else if (!lstrcmpi (p, "euc-tw"))
++  else if (!stricmp (p, "euc-tw"))
 +    p = "iso2022 lockgr euc-tw";
-+  else if (!lstrcmpi (p, "utf-8 (cjk)"))
++  else if (!stricmp (p, "utf-8 (cjk)"))
 +    p = "iso2022 lockgr utf-8-cjk";
-+  else if (!lstrcmpi (p, "utf-8 (non-cjk)"))
++  else if (!stricmp (p, "utf-8 (non-cjk)"))
 +    p = "iso2022 lockgr utf-8-noncjk";
-+  else if (!lstrcmpi (p, "euc-jp/auto-detect japanese"))
++  else if (!stricmp (p, "euc-jp/auto-detect japanese"))
 +    p = "iso2022 autojp-eucjp autojp-mskanji autojp-utf8 lockgr euc-jp";
-+  else if (!lstrcmpi (p, "MS_Kanji/auto-detect japanese"))
++  else if (!stricmp (p, "MS_Kanji/auto-detect japanese"))
 +    p = "iso2022 autojp-eucjp autojp-mskanji autojp-utf8 lockgr MS_Kanji";
-+  else if (!lstrcmpi (p, "Shift_JIS/auto-detect japanese"))
++  else if (!stricmp (p, "Shift_JIS/auto-detect japanese"))
 +    p = "iso2022 autojp-eucjp autojp-mskanji autojp-utf8 lockgr MS_Kanji";
-+  else if (!lstrcmpi (p, "utf-8/auto-detect japanese"))
++  else if (!stricmp (p, "utf-8/auto-detect japanese"))
 +    p = "iso2022 autojp-eucjp autojp-mskanji autojp-utf8 lockgr utf-8-cjk";
 +  if (strnicmp (p, "iso2022 ", 8))
 +    return -1;
 +  p += 8;
 +  {
 +    unsigned char initstring[512];
-+    OSVERSIONINFO ovi;
 +
-+    ovi.dwOSVersionInfoSize = sizeof (OSVERSIONINFO);
-+    GetVersionEx (&ovi);
-+    tmp_win95flag = (ovi.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS);
++    tmp_win95flag = get_win95flag ();
 +    tmp_lockgr = tmp_mskanji = tmp_big5 = tmp_ssgr = tmp_utf8cjk = tmp_utf8noncjk = 0;
 +    tmp_autojp_eucjp = tmp_autojp_mskanji = tmp_autojp_utf8 = 0;
 +    for (;;)
@@ -1819,7 +1971,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +	    p += 11;
 +	    continue;
 +	  }
-+	if (!lstrcmpi (p, "euc-jp"))
++	if (!stricmp (p, "euc-jp"))
 +	  {
 +	    p =
 +	      /* receiving */
@@ -1853,7 +2005,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +	    tmp_ssgr = 1;
 +	    break;
 +	  }
-+	if (!lstrcmpi (p, "euc-kr"))
++	if (!stricmp (p, "euc-kr"))
 +	  {
 +	    p =
 +	      /* receiving */
@@ -1880,7 +2032,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +	      "08";
 +	    break;
 +	  }
-+	if (!lstrcmpi (p, "euc-cn"))
++	if (!stricmp (p, "euc-cn"))
 +	  {
 +	    p =
 +	      /* receiving */
@@ -1907,7 +2059,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +	      "08";
 +	    break;
 +	  }
-+	if (!lstrcmpi (p, "euc-tw"))
++	if (!stricmp (p, "euc-tw"))
 +	  {
 +	    p =
 +	      /* receiving */
@@ -2089,6 +2241,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +  return iso2022_init (NULL, p, 2);
 +}
 +
++#ifdef _WINDOWS
 +int
 +xMultiByteToWideChar (UINT a1, DWORD a2, LPCSTR a3, int a4, LPWSTR a5, int a6)
 +{
@@ -2190,9 +2343,10 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.c
 +    a5[k] = '\0';
 +  return k + 1;
 +}
-diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.h
++#endif
+diff -r b9dfa96f2b06 -r 6555bf286954 iso2022.h
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/iso2022.h	Thu Dec 29 18:25:25 2011 +0900
++++ b/iso2022.h	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,18507 @@
 +static wchar_t jisc6226_1978[94][94]={
 +{0x3000,0x3001,0x3002,0xff0c,0xff0e,0x30fb,0xff1a,0xff1b,
@@ -20701,77 +20855,44 @@ diff -r a5f2d327e10f -r 69d8bf45f3db iso2022.h
 +/*x	  y	  z	  {   --  |   --  }   --  ~     */
 +  0x0078, 0x0079, 0x007a, 0x00b0, 0x00f1, 0x00e7, 0x007e, 0x007f,
 +};
-diff -r a5f2d327e10f -r 69d8bf45f3db l10ndummy.c
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/l10ndummy.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -0,0 +1,32 @@
-+#include <stdio.h>
-+#include <stdarg.h>
-+
-+int get_l10n_setting(const char* keyname, char* buf, int size)
-+{
-+    return 0;
-+}
-+
-+int xsprintf(char* buffer, const char* format, ...)
-+{
-+    int r;
-+    va_list args;
-+    va_start(args, format);
-+    r = vsprintf(buffer, format, args);
-+    va_end(args);
-+    return r;
-+}
-+
-+#ifdef _WINDOWS
-+#undef _vsnprintf
-+#define vsnprintf _vsnprintf
-+#else
-+#undef vsnprintf
-+#endif
-+int xvsnprintf(char* buffer, int size, const char* format, va_list args)
-+{
-+  return vsnprintf(buffer, size, format, args);
-+}
-+
-+char *l10n_dupstr (char *s) {
-+  return dupstr(s);
-+}
-diff -r a5f2d327e10f -r 69d8bf45f3db ldisc.c
---- a/ldisc.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/ldisc.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -119,6 +119,30 @@
+diff -r b9dfa96f2b06 -r 6555bf286954 ldisc.c
+--- a/ldisc.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/ldisc.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -119,6 +119,33 @@
  {
      Ldisc ldisc = (Ldisc) handle;
      int keyflag = 0;
-+    int iso2022;
-+    struct iso2022_data *iso2022_data_p;
++    struct iso2022_data *iso2022 = NULL;
 +
 +#define ISO2022_OUTPUT(a1,a2,a3,a4) do { \
 +	if (!iso2022) a1 (a2, a3, a4); \
 +	else { \
-+	    unsigned char a[100]; \
++	    char a[100]; \
 +	    char *p = a3; \
 +	    int b = 0; \
 +	    int l; \
 +	    l = a4; \
 +	    while (l) { \
-+		if (!iso2022_tbuflen (iso2022_data_p)) iso2022_transmit (iso2022_data_p, *p++), l--; \
-+		while (iso2022_tbuflen (iso2022_data_p)) { \
-+		    a[b++] = iso2022_tgetbuf (iso2022_data_p); \
-+		    if (b == sizeof a) a1 (a2, a, b), b = 0; \
++		if (!iso2022_tbuflen (iso2022)) \
++		    iso2022_transmit (iso2022, *p++), l--; \
++		while (iso2022_tbuflen (iso2022)) { \
++		    a[b++] = iso2022_tgetbuf (iso2022); \
++		    if (b == sizeof a) \
++			a1 (a2, a, b), b = 0; \
 +		} \
 +	    } \
-+	    if (b) a1 (a2, a, b); \
++	    if (b) \
++		a1 (a2, a, b); \
 +	} \
-+    } while (0);
-+    iso2022 = in_utf (ldisc->term) && ldisc->term->ucsdata->iso2022;
-+    if (iso2022) iso2022_data_p = &ldisc->term->ucsdata->iso2022_data;
-+    if (iso2022) iso2022_tbufclear (iso2022_data_p);
++    } while (0)
++    if (in_utf (ldisc->term) && ldisc->term->ucsdata->iso2022)
++	iso2022 = &ldisc->term->ucsdata->iso2022_data;
++    if (iso2022)
++	iso2022_tbufclear (iso2022);
      /*
       * Called with len=0 when the options change. We must inform
       * the front end in case it needs to know.
-@@ -299,7 +323,7 @@
+@@ -299,7 +326,7 @@
  	}
  	if (len > 0) {
  	    if (ECHOING)
@@ -20780,7 +20901,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db ldisc.c
  	    if (keyflag && ldisc->cfg->protocol == PROT_TELNET && len == 1) {
  		switch (buf[0]) {
  		  case CTRL('M'):
-@@ -330,7 +354,7 @@
+@@ -330,7 +357,7 @@
  		    break;
  		}
  	    } else
@@ -20789,23 +20910,35 @@ diff -r a5f2d327e10f -r 69d8bf45f3db ldisc.c
  	}
      }
  }
-diff -r a5f2d327e10f -r 69d8bf45f3db ldiscucs.c
---- a/ldiscucs.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/ldiscucs.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 ldiscucs.c
+--- a/ldiscucs.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/ldiscucs.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -93,8 +93,10 @@
  	else
  	    p = linebuffer;
      }
-+    if (in_utf (term) && term->ucsdata->iso2022) iso2022_settranschar (&term->ucsdata->iso2022_data, 1);
++    if (in_utf (ldisc->term) && ldisc->term->ucsdata->iso2022) iso2022_settranschar (&ldisc->term->ucsdata->iso2022_data, 1);
      if (p > linebuffer)
  	ldisc_send(ldisc, linebuffer, p - linebuffer, interactive);
-+    if (in_utf (term) && term->ucsdata->iso2022) iso2022_settranschar (&term->ucsdata->iso2022_data, 0);
++    if (in_utf (ldisc->term) && ldisc->term->ucsdata->iso2022) iso2022_settranschar (&ldisc->term->ucsdata->iso2022_data, 0);
  
      sfree(linebuffer);
  }
-diff -r a5f2d327e10f -r 69d8bf45f3db mkfiles.pl
---- a/mkfiles.pl	Thu Dec 29 18:30:44 2011 +0900
-+++ b/mkfiles.pl	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 minibidi.c
+--- a/minibidi.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/minibidi.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -58,7 +58,7 @@
+ #define leastGreaterEven(x) ( ((x)+2) &~ 1 )
+ 
+ typedef struct bidi_char {
+-    wchar_t origwc, wc;
++    unsigned long origwc, wc; /* yoshidam */
+     unsigned short index;
+ } bidi_char;
+ 
+diff -r b9dfa96f2b06 -r 6555bf286954 mkfiles.pl
+--- a/mkfiles.pl	Thu Jan 12 20:53:35 2012 +0900
++++ b/mkfiles.pl	Mon Jan 30 23:51:03 2012 +0900
 @@ -662,6 +662,9 @@
        "\t-del *.plg\n".
        "\t-del *.map\n".
@@ -20816,9 +20949,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db mkfiles.pl
        "\t-del debug.log\n";
      select STDOUT; close OUT;
  }
-diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
---- a/putty.h	Thu Dec 29 18:30:44 2011 +0900
-+++ b/putty.h	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 putty.h
+--- a/putty.h	Thu Jan 12 20:53:35 2012 +0900
++++ b/putty.h	Mon Jan 30 23:51:03 2012 +0900
 @@ -61,7 +61,7 @@
  
  #define DATTR_STARTRUN      0x80000000UL   /* start of redraw run */
@@ -20924,7 +21057,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
  };
  
  #define LGXF_OVR  1		       /* existing logfile overwrite */
-@@ -413,6 +480,11 @@
+@@ -413,6 +480,40 @@
      ADDRTYPE_UNSPEC, ADDRTYPE_IPV4, ADDRTYPE_IPV6, ADDRTYPE_NAME
  };
  
@@ -20933,10 +21066,39 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
 +    URL_UNDERLINE_ALWAYS, URL_UNDERLINE_HOVER, URL_UNDERLINE_NEVER
 +};
 +
++/* Background */
++typedef enum {
++    ALPHA_FG, ALPHA_BG, ALPHA_DEFAULT_BG, ALPHA_WINDOW
++};
++
++typedef enum {
++    BG_NONE, BG_FILE, BG_FILE_DESKTOP, BG_DESKTOP
++};
++
++typedef enum {
++    BG_PLANE, BG_GLASS, BG_DOUBLE_GLASS
++};
++
++typedef enum {
++    BG_ACTIVE, BG_INACTIVE
++};
++
++enum {
++    WP_FILL, WP_FIT, WP_STRETCH, WP_TILE, WP_FIX
++};
++
++enum {
++    WP_LEFT, WP_CENTER, WP_RIGHT
++};
++
++enum {
++    WP_TOP, WP_MIDDLE, WP_BOTTOM
++};
++
  struct backend_tag {
      const char *(*init) (void *frontend_handle, void **backend_handle,
  			 Config *cfg,
-@@ -559,6 +631,8 @@
+@@ -559,6 +660,8 @@
      int alt_f4;			       /* is it special? */
      int alt_space;		       /* is it special? */
      int alt_only;		       /* is it special? */
@@ -20945,7 +21107,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
      int localecho;
      int localedit;
      int alwaysontop;
-@@ -568,6 +642,9 @@
+@@ -568,6 +671,9 @@
      int erase_to_scrollback;
      int compose_key;
      int ctrlaltkeys;
@@ -20955,7 +21117,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
      char wintitle[256];		       /* initial window title */
      /* Terminal options */
      int savelines;
-@@ -590,6 +667,7 @@
+@@ -590,6 +696,7 @@
      int blinktext;
      int win_name_always;
      int width, height;
@@ -20963,7 +21125,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
      FontSpec font;
      int font_quality;
      Filename logfilename;
-@@ -611,12 +689,13 @@
+@@ -611,12 +718,13 @@
      int system_colour;
      int try_palette;
      int bold_colour;
@@ -20978,7 +21140,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
      int mouse_override;
      short wordness[256];
      /* translations */
-@@ -625,6 +704,7 @@
+@@ -625,6 +733,7 @@
      int cjk_ambig_wide;
      int utf8_override;
      int xlat_capslockcyr;
@@ -20986,22 +21148,14 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
      /* X11 forwarding */
      int x11_forward;
      char x11_display[128];
-@@ -667,6 +747,25 @@
+@@ -667,6 +776,27 @@
      int shadowboldoffset;
      int crhaslf;
      char winclass[256];
-+	/* > transparent background patch */
-+	int transparent_mode;
-+	int shading;
-+	int use_alphablend;
-+    int stop_when_moving;
-+    Filename bgimg_file;
-+	/* < */
++
 +    Filename iconfile;
 + 
-+    /*
-+     * HACK: PuttyTray / Reconnect
-+     */
++    /* HACK: PuttyTray / Reconnect */
 +    int wakeup_reconnect;
 +    int failure_reconnect;
 +
@@ -21009,10 +21163,20 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
 +    int url_enable;
 +    int url_underline;
 +    int url_ctrl_click;
++
++    /* Background */
++    int alphas_pc[4][2];
++    int bg_wallpaper;
++    int bg_effect;
++    Filename wp_file;
++    int wp_position;
++    int wp_align;
++    int wp_valign;
++    int wp_moving;
  };
  
  /*
-@@ -766,8 +865,8 @@
+@@ -766,8 +896,8 @@
   * Exports from the front end.
   */
  void request_resize(void *frontend, int, int);
@@ -21023,7 +21187,16 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
  int char_width(Context ctx, int uc);
  #ifdef OPTIMISE_SCROLL
  void do_scroll(Context, int, int, int);
-@@ -1195,6 +1294,7 @@
+@@ -1168,7 +1298,7 @@
+  * Exports from minibidi.c.
+  */
+ typedef struct bidi_char {
+-    wchar_t origwc, wc;
++    unsigned long origwc, wc; /* yoshidam */
+     unsigned short index;
+ } bidi_char;
+ int do_bidi(bidi_char *line, int count);
+@@ -1195,6 +1325,7 @@
  int filename_is_null(Filename fn);
  char *get_username(void);	       /* return value needs freeing */
  char *get_random_data(int bytes);      /* used in cmdgen.c */
@@ -21031,25 +21204,19 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
  
  /*
   * Exports and imports from timing.c.
-@@ -1303,4 +1403,34 @@
+@@ -1303,4 +1434,57 @@
  #define remove_session_from_jumplist(x) ((void)0)
  #endif
  
 +/*
 + * Exports from iso2022.c
 + */
-+int xMultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);
-+int xWideCharToMultiByte(UINT, DWORD, LPCWSTR, int, LPSTR, int,
-+                         LPCSTR, LPBOOL);
-+#define MultiByteToWideChar xMultiByteToWideChar
-+#define WideCharToMultiByte xWideCharToMultiByte
-+
 +int iso2022_init (struct iso2022_data *this, char *p, int mode);
 +int iso2022_init_test (char *p);
 +void iso2022_transmit (struct iso2022_data *this, unsigned char c);
 +void iso2022_put (struct iso2022_data *this, unsigned char c);
 +void iso2022_clearesc (struct iso2022_data *this);
-+int iso2022_width (struct iso2022_data *this, wchar_t);
++int iso2022_width_sub (struct iso2022_data *this, wchar_t);
 +unsigned char iso2022_tgetbuf (struct iso2022_data *this);
 +unsigned char iso2022_getbuf (struct iso2022_data *this);
 +void iso2022_settranschar (struct iso2022_data *this, int value);
@@ -21059,26 +21226,46 @@ diff -r a5f2d327e10f -r 69d8bf45f3db putty.h
 +void iso2022_autodetect_put (struct iso2022_data *this, unsigned char *buf,
 +			     int nchars);
 +
++static __inline int
++iso2022_width (struct iso2022_data *this, wchar_t c)
++{
++  int width;
++
++  width = iso2022_width_sub (this, c);
++  switch (width)
++    {
++    case -1:
++      return mk_wcwidth_cjk (c);
++    case -2:
++      return mk_wcwidth (c);
++    default:
++      return width;
++    }
++}
++
 +/*
-+ * Exports from l10n.c
++ * Exports from winl10n.c/uxl10n.c
 + */
 +char *l10n_dupstr (char *);
 +int get_l10n_setting(const char* keyname, char* buf, int size);
 +
- #endif
-diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
---- a/settings.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/settings.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -432,11 +432,20 @@
-     write_setting_i(sesskey, "ApplicationCursorKeys", cfg->app_cursor);
-     write_setting_i(sesskey, "ApplicationKeypad", cfg->app_keypad);
-     write_setting_i(sesskey, "NetHackKeypad", cfg->nethack_keypad);
-+    /*
-+     * HACK: PuttyTray / Reconnect
-+     */
-+    write_setting_i(sesskey, "WakeupReconnect", cfg->wakeup_reconnect);
-+    write_setting_i(sesskey, "FailureReconnect", cfg->failure_reconnect);
++/* yoshidam */
++#ifndef IS_HIGH_SURROGATE
++#define HIGH_SURROGATE_START 0xd800
++#define HIGH_SURROGATE_END 0xdbff
++#define LOW_SURROGATE_START 0xdc00
++#define LOW_SURROGATE_END 0xdfff
 +
++#define IS_HIGH_SURROGATE(wch) (((wch) >= HIGH_SURROGATE_START) && ((wch) <= HIGH_SURROGATE_END))
++#define IS_LOW_SURROGATE(wch) (((wch) >= LOW_SURROGATE_START) && ((wch) <= LOW_SURROGATE_END))
++#define IS_SURROGATE_PAIR(hs, ls) (IS_HIGH_SURROGATE(hs) && IS_LOW_SURROGATE(ls))
+ #endif
++
++#endif
+diff -r b9dfa96f2b06 -r 6555bf286954 settings.c
+--- a/settings.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/settings.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -435,8 +435,11 @@
      write_setting_i(sesskey, "AltF4", cfg->alt_f4);
      write_setting_i(sesskey, "AltSpace", cfg->alt_space);
      write_setting_i(sesskey, "AltOnly", cfg->alt_only);
@@ -21090,7 +21277,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      write_setting_i(sesskey, "TelnetKey", cfg->telnet_keyboard);
      write_setting_i(sesskey, "TelnetRet", cfg->telnet_newline);
      write_setting_i(sesskey, "LocalEcho", cfg->localecho);
-@@ -446,6 +455,7 @@
+@@ -446,6 +449,7 @@
      write_setting_i(sesskey, "FullScreenOnAltEnter", cfg->fullscreenonaltenter);
      write_setting_i(sesskey, "HideMousePtr", cfg->hide_mouseptr);
      write_setting_i(sesskey, "SunkenEdge", cfg->sunken_edge);
@@ -21098,7 +21285,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      write_setting_i(sesskey, "WindowBorder", cfg->window_border);
      write_setting_i(sesskey, "CurType", cfg->cursor_type);
      write_setting_i(sesskey, "BlinkCur", cfg->blink_cur);
-@@ -475,6 +485,8 @@
+@@ -475,6 +479,8 @@
      write_setting_s(sesskey, "WinTitle", cfg->wintitle);
      write_setting_i(sesskey, "TermWidth", cfg->width);
      write_setting_i(sesskey, "TermHeight", cfg->height);
@@ -21107,7 +21294,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      write_setting_fontspec(sesskey, "Font", cfg->font);
      write_setting_i(sesskey, "FontQuality", cfg->font_quality);
      write_setting_i(sesskey, "FontVTMode", cfg->vtmode);
-@@ -484,7 +496,7 @@
+@@ -484,7 +490,7 @@
      write_setting_i(sesskey, "Xterm256Colour", cfg->xterm_256_colour);
      write_setting_i(sesskey, "BoldAsColour", cfg->bold_colour);
  
@@ -21116,7 +21303,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
  	char buf[20], buf2[30];
  	sprintf(buf, "Colour%d", i);
  	sprintf(buf2, "%d,%d,%d", cfg->colours[i][0],
-@@ -493,6 +505,7 @@
+@@ -493,6 +499,7 @@
      }
      write_setting_i(sesskey, "RawCNP", cfg->rawcnp);
      write_setting_i(sesskey, "PasteRTF", cfg->rtf_paste);
@@ -21124,7 +21311,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      write_setting_i(sesskey, "MouseIsXterm", cfg->mouse_is_xterm);
      write_setting_i(sesskey, "RectSelect", cfg->rect_select);
      write_setting_i(sesskey, "MouseOverride", cfg->mouse_override);
-@@ -512,6 +525,7 @@
+@@ -512,6 +519,7 @@
      write_setting_i(sesskey, "UTF8Override", cfg->utf8_override);
      write_setting_s(sesskey, "Printer", cfg->printer);
      write_setting_i(sesskey, "CapsLockCyr", cfg->xlat_capslockcyr);
@@ -21132,42 +21319,40 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      write_setting_i(sesskey, "ScrollBar", cfg->scrollbar);
      write_setting_i(sesskey, "ScrollBarFullScreen", cfg->scrollbar_in_fullscreen);
      write_setting_i(sesskey, "ScrollOnKey", cfg->scroll_on_key);
-@@ -545,6 +559,13 @@
-     write_setting_fontspec(sesskey, "WideBoldFont", cfg->wideboldfont);
-     write_setting_i(sesskey, "ShadowBold", cfg->shadowbold);
-     write_setting_i(sesskey, "ShadowBoldOffset", cfg->shadowboldoffset);
-+    /* > transparent background patch */
-+    write_setting_i( sesskey, "TransparentMode", cfg->transparent_mode );
-+    write_setting_i( sesskey, "Shading", cfg->shading );
-+    write_setting_i( sesskey, "UseAlphaBlend", cfg->use_alphablend );
-+    write_setting_i( sesskey, "StoppedToDraw", cfg->stop_when_moving );
-+    write_setting_filename( sesskey, "BackgroundImageFile", cfg->bgimg_file );
-+    /* < */
-     write_setting_s(sesskey, "SerialLine", cfg->serline);
-     write_setting_i(sesskey, "SerialSpeed", cfg->serspeed);
-     write_setting_i(sesskey, "SerialDataBits", cfg->serdatabits);
-@@ -552,6 +573,11 @@
+@@ -552,6 +560,32 @@
      write_setting_i(sesskey, "SerialParity", cfg->serparity);
      write_setting_i(sesskey, "SerialFlowControl", cfg->serflow);
      write_setting_s(sesskey, "WindowClass", cfg->winclass);
++
++    /* HACK: PuttyTray / Reconnect */
++    write_setting_i(sesskey, "WakeupReconnect", cfg->wakeup_reconnect);
++    write_setting_i(sesskey, "FailureReconnect", cfg->failure_reconnect);
 +
 +    /* Hyperlink */
 +    write_setting_i(sesskey, "HyperlinkEnable", cfg->url_enable);
 +    write_setting_i(sesskey, "HyperlinkUnderline", cfg->url_underline);
 +    write_setting_i(sesskey, "HyperlinkUseCtrlClick", cfg->url_ctrl_click);
++
++    /* Background */
++    write_setting_i(sesskey, "BackgroundWallpaper", cfg->bg_wallpaper);
++    write_setting_i(sesskey, "BackgroundEffect", cfg->bg_effect);
++    write_setting_filename(sesskey, "WallpaperFile", cfg->wp_file);
++    write_setting_i(sesskey, "WallpaperPosition", cfg->wp_position);
++    write_setting_i(sesskey, "WallpaperAlign", cfg->wp_align);
++    write_setting_i(sesskey, "WallpaperVerticalAlign", cfg->wp_valign);
++    write_setting_i(sesskey, "WallpaperMoving", cfg->wp_moving);
++
++    /* Transparency */
++    for (i = 0; i < 4; i++) {
++	char buf[16], buf2[16];
++	sprintf(buf, "Alpha%d", i);
++	sprintf(buf2, "%d,%d", cfg->alphas_pc[i][0], cfg->alphas_pc[i][1]);
++	write_setting_s(sesskey, buf, buf2);
++    }
  }
  
  void load_settings(char *section, Config * cfg)
-@@ -739,11 +765,20 @@
-     gppi(sesskey, "ApplicationCursorKeys", 0, &cfg->app_cursor);
-     gppi(sesskey, "ApplicationKeypad", 0, &cfg->app_keypad);
-     gppi(sesskey, "NetHackKeypad", 0, &cfg->nethack_keypad);
-+    /*
-+     * HACK: PuttyTray / Reconnect
-+     */
-+    gppi(sesskey, "WakeupReconnect", 0, &cfg->wakeup_reconnect);
-+    gppi(sesskey, "FailureReconnect", 0, &cfg->failure_reconnect);
-+
+@@ -742,8 +776,11 @@
      gppi(sesskey, "AltF4", 1, &cfg->alt_f4);
      gppi(sesskey, "AltSpace", 0, &cfg->alt_space);
      gppi(sesskey, "AltOnly", 0, &cfg->alt_only);
@@ -21179,7 +21364,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      gppi(sesskey, "TelnetKey", 0, &cfg->telnet_keyboard);
      gppi(sesskey, "TelnetRet", 1, &cfg->telnet_newline);
      gppi(sesskey, "LocalEcho", AUTO, &cfg->localecho);
-@@ -754,9 +789,38 @@
+@@ -754,9 +791,38 @@
      gppi(sesskey, "FullScreenOnAltEnter", 0, &cfg->fullscreenonaltenter);
      gppi(sesskey, "HideMousePtr", 0, &cfg->hide_mouseptr);
      gppi(sesskey, "SunkenEdge", 0, &cfg->sunken_edge);
@@ -21218,7 +21403,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      /* pedantic compiler tells me I can't use &cfg->beep as an int * :-) */
      gppi(sesskey, "Beep", 1, &cfg->beep);
      gppi(sesskey, "BeepInd", 0, &cfg->beep_ind);
-@@ -794,6 +858,8 @@
+@@ -794,6 +860,8 @@
      gpps(sesskey, "WinTitle", "", cfg->wintitle, sizeof(cfg->wintitle));
      gppi(sesskey, "TermWidth", 80, &cfg->width);
      gppi(sesskey, "TermHeight", 24, &cfg->height);
@@ -21227,7 +21412,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      gppfont(sesskey, "Font", &cfg->font);
      gppi(sesskey, "FontQuality", FQ_DEFAULT, &cfg->font_quality);
      gppi(sesskey, "FontVTMode", VT_UNICODE, (int *) &cfg->vtmode);
-@@ -803,14 +869,15 @@
+@@ -803,14 +871,15 @@
      gppi(sesskey, "Xterm256Colour", 1, &cfg->xterm_256_colour);
      gppi(sesskey, "BoldAsColour", 1, &cfg->bold_colour);
  
@@ -21246,7 +21431,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
  	char buf[20], buf2[30];
  	int c0, c1, c2;
  	sprintf(buf, "Colour%d", i);
-@@ -823,6 +890,8 @@
+@@ -823,6 +892,8 @@
      }
      gppi(sesskey, "RawCNP", 0, &cfg->rawcnp);
      gppi(sesskey, "PasteRTF", 0, &cfg->rtf_paste);
@@ -21255,7 +21440,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      gppi(sesskey, "MouseIsXterm", 0, &cfg->mouse_is_xterm);
      gppi(sesskey, "RectSelect", 0, &cfg->rect_select);
      gppi(sesskey, "MouseOverride", 1, &cfg->mouse_override);
-@@ -855,12 +924,30 @@
+@@ -855,12 +926,30 @@
       * The empty default for LineCodePage will be converted later
       * into a plausible default for the locale.
       */
@@ -21287,35 +21472,56 @@ diff -r a5f2d327e10f -r 69d8bf45f3db settings.c
      gppi(sesskey, "ScrollBar", 1, &cfg->scrollbar);
      gppi(sesskey, "ScrollBarFullScreen", 0, &cfg->scrollbar_in_fullscreen);
      gppi(sesskey, "ScrollOnKey", 0, &cfg->scroll_on_key);
-@@ -905,6 +992,13 @@
-     gppfont(sesskey, "WideFont", &cfg->widefont);
-     gppfont(sesskey, "WideBoldFont", &cfg->wideboldfont);
-     gppi(sesskey, "ShadowBoldOffset", 1, &cfg->shadowboldoffset);
-+    /* > transparent background patch */
-+    gppi( sesskey, "TransparentMode", 0, &cfg->transparent_mode );
-+    gppi( sesskey, "Shading", 0, &cfg->shading );
-+    gppi( sesskey, "UseAlphaBlend", 0, &cfg->use_alphablend );
-+    gppi( sesskey, "StoppedToDraw", 0, &cfg->stop_when_moving );
-+    gppfile( sesskey, "BackgroundImageFile", &cfg->bgimg_file );
-+    /* < */
-     gpps(sesskey, "SerialLine", "", cfg->serline, sizeof(cfg->serline));
-     gppi(sesskey, "SerialSpeed", 9600, &cfg->serspeed);
-     gppi(sesskey, "SerialDataBits", 8, &cfg->serdatabits);
-@@ -912,6 +1006,11 @@
+@@ -912,6 +1001,46 @@
      gppi(sesskey, "SerialParity", SER_PAR_NONE, &cfg->serparity);
      gppi(sesskey, "SerialFlowControl", SER_FLOW_XONXOFF, &cfg->serflow);
      gpps(sesskey, "WindowClass", "", cfg->winclass, sizeof(cfg->winclass));
++
++    /* HACK: PuttyTray / Reconnect */
++    gppi(sesskey, "WakeupReconnect", 0, &cfg->wakeup_reconnect);
++    gppi(sesskey, "FailureReconnect", 0, &cfg->failure_reconnect);
 +
 +    /* Hyperlink */
 +    gppi(sesskey, "HyperlinkEnable", 1, &cfg->url_enable);
 +    gppi(sesskey, "HyperlinkUnderline", 1, &cfg->url_underline);
 +    gppi(sesskey, "HyperlinkUseCtrlClick", 1, &cfg->url_ctrl_click);
++
++    /* Background */
++    gppi(sesskey, "BackgroundWallpaper", 0, &cfg->bg_wallpaper);
++    gppi(sesskey, "BackgroundEffect", 0, &cfg->bg_effect);
++    gppfile(sesskey, "WallpaperFile", &cfg->wp_file);
++    gppi(sesskey, "WallpaperPosition", 0, &cfg->wp_position);
++    gppi(sesskey, "WallpaperAlign", 0, &cfg->wp_align);
++    gppi(sesskey, "WallpaperVerticalAlign", 0, &cfg->wp_valign);
++    gppi(sesskey, "WallpaperMoving", 0, &cfg->wp_moving);
++
++    /* Transparency */
++    for (i = 0; i < 4; i++) {
++	static const char *const defaults[] = {
++	    "100,100", "100,100", "100,100", "100,100"
++	};
++	char buf[16], buf2[16];
++	int c0 = 100;
++	int c1 = 100;
++	sprintf(buf, "Alpha%d", i);
++	gpps(sesskey, buf, defaults[i], buf2, sizeof(buf2));
++	if (sscanf(buf2, "%d,%d", &c0, &c1)) {
++	    if (c0 > 100) {
++		c0 = 100;
++	    }
++	    if (c1 > 100) {
++		c1 = 100;
++	    }
++	    cfg->alphas_pc[i][0] = c0;
++	    cfg->alphas_pc[i][1] = c1;
++	}
++    }
  }
  
  void do_defaults(char *session, Config * cfg)
-diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
---- a/terminal.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/terminal.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 terminal.c
+--- a/terminal.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/terminal.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -110,6 +110,47 @@
  static void scroll_display(Terminal *, int, int, int);
  #endif /* OPTIMISE_SCROLL */
@@ -21392,15 +21598,17 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  
      val = get(b) << 8;
      val |= get(b);
-@@ -1184,6 +1226,7 @@
+@@ -1184,6 +1226,9 @@
   */
  static void power_on(Terminal *term, int clear)
  {
-+    if (in_utf (term)) term->ucsdata->iso2022 = !iso2022_init (&term->ucsdata->iso2022_data, term->cfg.line_codepage, 0);
++    if (in_utf (term))
++	term->ucsdata->iso2022 = !iso2022_init (&term->ucsdata->iso2022_data,
++						term->cfg.line_codepage, 0);
      term->alt_x = term->alt_y = 0;
      term->savecurs.x = term->savecurs.y = 0;
      term->alt_savecurs.x = term->alt_savecurs.y = 0;
-@@ -1403,6 +1446,11 @@
+@@ -1403,6 +1448,11 @@
      }
      term_schedule_tblink(term);
      term_schedule_cblink(term);
@@ -21412,7 +21620,15 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  }
  
  /*
-@@ -1497,6 +1545,11 @@
+@@ -1491,12 +1541,19 @@
+     term->bidi_cache_size = 0;
+     term->pre_bidi_cache = term->post_bidi_cache = NULL;
+ 
++    term->bracketed_paste = 0;
++
+     /* FULL-TERMCHAR */
+     term->basic_erase_char.chr = CSET_ASCII | ' ';
+     term->basic_erase_char.attr = ATTR_DEFAULT;
      term->basic_erase_char.cc_next = 0;
      term->erase_char = term->basic_erase_char;
  
@@ -21424,49 +21640,61 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
      return term;
  }
  
-@@ -2526,18 +2579,27 @@
+@@ -2420,6 +2477,9 @@
+ 		save_cursor(term, state);
+ 	    term->disptop = 0;
+ 	    break;
++	  case 2004:		       /* xterm bracketed paste */
++	    term->bracketed_paste = state ? 1 : 0;
++	    break;
+     } else
+ 	switch (mode) {
+ 	  case 4:		       /* IRM: set insert mode */
+@@ -2526,18 +2586,27 @@
      int unget;
      unsigned char localbuf[256], *chars;
      int nchars = 0;
-+    int iso2022;
-+    struct iso2022_data *iso2022_data_p;
++    struct iso2022_data *iso2022 = NULL;
  
      unget = -1;
  
-+    iso2022 = in_utf (term) && term->ucsdata->iso2022;
-+    if (iso2022) iso2022_data_p = &term->ucsdata->iso2022_data;
++    if (in_utf (term) && term->ucsdata->iso2022)
++	iso2022 = &term->ucsdata->iso2022_data;
      chars = NULL;		       /* placate compiler warnings */
 -    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0) {
-+    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0 || (iso2022 && iso2022_buflen (iso2022_data_p) > 0)) {
++    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0 ||
++	   (iso2022 && iso2022_buflen (iso2022) > 0)) {
  	if (unget == -1) {
-+	    if (iso2022 && term->termstate == TOPLEVEL) iso2022_clearesc (iso2022_data_p);
-+	    if (!iso2022 || !iso2022_buflen (iso2022_data_p)) {
++	    if (iso2022 && term->termstate == TOPLEVEL)
++		iso2022_clearesc (iso2022);
++	    if (!iso2022 || !iso2022_buflen (iso2022)) {
  	    if (nchars == 0) {
  		void *ret;
  		bufchain_prefix(&term->inbuf, &ret, &nchars);
  		if (nchars > sizeof(localbuf))
  		    nchars = sizeof(localbuf);
  		memcpy(localbuf, ret, nchars);
-+		if (iso2022) {
-+		     iso2022_autodetect_put (iso2022_data_p, localbuf, nchars);
-+		}
++		if (iso2022)
++		    iso2022_autodetect_put (iso2022, localbuf, nchars);
  		bufchain_consume(&term->inbuf, nchars);
  		chars = localbuf;
  		assert(chars != NULL);
-@@ -2551,6 +2613,12 @@
+@@ -2551,6 +2620,14 @@
  	     */
  	    if (term->cfg.logtype == LGTYP_DEBUG && term->logctx)
  		logtraffic(term->logctx, (unsigned char) c, LGTYP_DEBUG);
-+	    if (iso2022) iso2022_put (iso2022_data_p, c);
++	    if (iso2022) iso2022_put (iso2022, c);
 +	    }
 +	    if (iso2022) {
-+		if (iso2022_buflen (iso2022_data_p) > 0) c = iso2022_getbuf (iso2022_data_p);
-+		else continue;
++		if (iso2022_buflen (iso2022) > 0)
++		    c = iso2022_getbuf (iso2022);
++		else
++		    continue;
 +	    }
  	} else {
  	    c = unget;
  	    unget = -1;
-@@ -2660,6 +2728,7 @@
+@@ -2660,6 +2737,7 @@
  		    /* The UTF-16 surrogates are not nice either. */
  		    /*       The standard give the option of decoding these: 
  		     *       I don't want to! */
@@ -21474,22 +21702,41 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  		    if (c >= 0xD800 && c < 0xE000)
  			c = UCSERR;
  
-@@ -2940,12 +3009,14 @@
- 		{
- 		    termline *cline = scrlineptr(term->curs.y);
+@@ -2942,10 +3020,32 @@
  		    int width = 0;
-+		    if (!iso2022) {
  		    if (DIRECT_CHAR(c))
  			width = 1;
- 		    if (!width)
+-		    if (!width)
++		    if (iso2022)
++			width = iso2022_width (iso2022, (wchar_t)c);
++		    if (!width || c >= 0x10000) {
  			width = (term->cfg.cjk_ambig_wide ?
  				 mk_wcwidth_cjk((wchar_t) c) :
  				 mk_wcwidth((wchar_t) c));
-+		    } else width = iso2022_width (iso2022_data_p, (wchar_t) c);
++			/* yoshidam: wchar_t loses Unicode value */
++			if ((c >= 0x20000 && c <= 0x2FFFD) ||   /* SIP */
++			    (c >= 0x30000 && c <= 0x3FFFD) ||   /* TIP */
++			    (c >= 0x1F200 && c <= 0x1F2DD) ||   /* ENCLOSED IDEOGRAPHIC SUPPL. */
++			    (c >= 0x1B000 && c <= 0x1B0FF))     /* KANA SUPPL. */
++			    width = 2;
++			else if ((c >= 0xE0100 && c <= 0xE01EF))  /* VARIATION SELECTOR */
++			    width = 0;
++			else if ((c >= 0x10000 && c <= 0x1FFFD) || /* SMP */
++				 (c >= 0xE0000 && c <= 0xEFFFD) || /* SSP */
++				 (c >= 0xF0000 && c <= 0xFFFFD) || /* PRIVATE */
++				 (c >= 0x100000 && c <= 0x10FFFD)) /* PRIVATE */
++			    width = 1;
++
++			if (term->cfg.cjk_ambig_wide &&
++			    ((c >= 0x1F100 && c <= 0x1F19A) ||  /* ENCLOSED ALPHANUMERIC SUPPL. */
++			     (c >= 0xF0000 && c <= 0xFFFFD) ||  /* PRIVATE */
++			     (c >= 0x100000 && c <= 0x10FFFD))) /* PRIVATE */
++			    width++;
++		    }
  
  		    if (term->wrapnext && term->wrap && width > 0) {
  			cline->lattr |= LATTR_WRAPPED;
-@@ -2964,6 +3035,25 @@
+@@ -2964,6 +3064,25 @@
  			incpos(cursplus);
  			check_selection(term, term->curs, cursplus);
  		    }
@@ -21515,7 +21762,16 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  		    if (((c & CSET_MASK) == CSET_ASCII ||
  			 (c & CSET_MASK) == 0) &&
  			term->logctx)
-@@ -4664,6 +4754,125 @@
+@@ -4616,7 +4735,7 @@
+ 		}
+ 
+ 		term->wcFrom[it].origwc = term->wcFrom[it].wc =
+-		    (wchar_t)uc;
++		    uc; /* yoshidam: wchar_t loses Unicode value  */
+ 		term->wcFrom[it].index = it;
+ 	    }
+ 
+@@ -4664,6 +4783,125 @@
      return lchars;
  }
  
@@ -21641,7 +21897,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  /*
   * Given a context, update the window. Out of paranoia, we don't
   * allow WM_PAINT responses to do scrolling optimisations.
-@@ -4769,12 +4978,18 @@
+@@ -4769,12 +5007,18 @@
      term->scrollhead = term->scrolltail = NULL;
  #endif /* OPTIMISE_SCROLL */
  
@@ -21661,7 +21917,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  	int start = 0;
  	int ccount = 0;
  	int last_run_dirty = 0;
-@@ -4798,7 +5013,8 @@
+@@ -4798,7 +5042,8 @@
  	 * each character cell to look like.
  	 */
  	for (j = 0; j < term->cols; j++) {
@@ -21671,7 +21927,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  	    termchar *d = lchars + j;
  	    scrpos.x = backward ? backward[j] : j;
  
-@@ -4917,6 +5133,10 @@
+@@ -4917,6 +5162,10 @@
  
  	    if (dirtyrect)
  		term->disptext[i]->chars[j].attr |= ATTR_INVALID;
@@ -21682,7 +21938,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  	}
  
  	/*
-@@ -4927,7 +5147,8 @@
+@@ -4927,7 +5176,8 @@
  	term->disptext[i]->lattr = ldata->lattr;
  
  	for (j = 0; j < term->cols; j++) {
@@ -21692,7 +21948,43 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  	    int break_run, do_copy;
  	    termchar *d = lchars + j;
  
-@@ -5193,7 +5414,7 @@
+@@ -4991,10 +5241,16 @@
+ 		dirty_run = TRUE;
+ 	    }
+ 
+-	    if (ccount >= chlen) {
++	    if (ccount+1 >= chlen) { /* yoshidam */
+ 		chlen = ccount + 256;
+ 		ch = sresize(ch, chlen, wchar_t);
+ 	    }
++	    /* yoshidam: decompose Unicode value into SURROGATE PAIR */
++	    if (tchar > 0x10000 && tchar < 0x110000) {
++		ch[ccount++] = (wchar_t) (0xD800 | ((tchar - 0x10000) >> 10));
++		ch[ccount++] = (wchar_t) (0xDC00 | ((tchar - 0x10000) & 0x3FF));
++	    }
++	    else
+ 	    ch[ccount++] = (wchar_t) tchar;
+ 
+ 	    if (d->cc_next) {
+@@ -5018,10 +5274,16 @@
+ 			break;
+ 		    }
+ 
+-		    if (ccount >= chlen) {
++		    if (ccount+1 >= chlen) { /* yoshidam */
+ 			chlen = ccount + 256;
+ 			ch = sresize(ch, chlen, wchar_t);
+ 		    }
++		    /* yoshidam: decompose Unicode value into SURROGATE PAIR */
++		    if (schar > 0x10000 && schar < 0x110000) {
++			ch[ccount++] = (wchar_t) (0xD800 | ((schar - 0x10000) >> 10));
++			ch[ccount++] = (wchar_t) (0xDC00 | ((schar - 0x10000) & 0x3FF));
++		    }
++		    else
+ 		    ch[ccount++] = (wchar_t) schar;
+ 		}
+ 
+@@ -5193,7 +5455,7 @@
  {
      clip_workbuf buf;
      int old_top_x;
@@ -21701,7 +21993,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  
      buf.buflen = 5120;			
      buf.bufpos = 0;
-@@ -5265,6 +5486,15 @@
+@@ -5265,6 +5527,15 @@
  		int uc = ldata->chars[x].chr;
                  attr = ldata->chars[x].attr;
  
@@ -21717,7 +22009,33 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
  		switch (uc & CSET_MASK) {
  		  case CSET_LINEDRW:
  		    if (!term->cfg.rawcnp) {
-@@ -5846,6 +6076,79 @@
+@@ -5606,7 +5877,12 @@
+         if (term->paste_buffer)
+             sfree(term->paste_buffer);
+         term->paste_pos = term->paste_hold = term->paste_len = 0;
+-        term->paste_buffer = snewn(len, wchar_t);
++        term->paste_buffer = snewn(len + 12, wchar_t);
++
++        if (term->bracketed_paste) {
++            memcpy(term->paste_buffer, L"\033[200~", 6 * sizeof(wchar_t));
++            term->paste_len += 6;
++        }
+ 
+         p = q = data;
+         while (p < data + len) {
+@@ -5630,6 +5906,11 @@
+             q = p;
+         }
+ 
++        if (term->bracketed_paste) {
++            memcpy(&term->paste_buffer[term->paste_len], L"\033[201~", 6 * sizeof(wchar_t));
++            term->paste_len += 6;
++        }
++
+         /* Assume a small paste will be OK in one go. */
+         if (term->paste_len < 256) {
+             if (term->ldisc)
+@@ -5846,6 +6127,79 @@
  	    term->selend.y =   max(term->selanchor.y, selpoint.y);
  	}
  	sel_spread(term);
@@ -21797,9 +22115,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.c
      } else if ((bcooked == MBT_SELECT || bcooked == MBT_EXTEND) &&
  	       a == MA_RELEASE) {
  	if (term->selstate == DRAGGING) {
-diff -r a5f2d327e10f -r 69d8bf45f3db terminal.h
---- a/terminal.h	Thu Dec 29 18:30:44 2011 +0900
-+++ b/terminal.h	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 terminal.h
+--- a/terminal.h	Thu Jan 12 20:53:35 2012 +0900
++++ b/terminal.h	Mon Jan 30 23:51:03 2012 +0900
 @@ -39,7 +39,7 @@
       * saying FULL-TERMCHAR.
       */
@@ -21809,19 +22127,84 @@ diff -r a5f2d327e10f -r 69d8bf45f3db terminal.h
  
      /*
       * The cc_next field is used to link multiple termchars
-@@ -273,6 +273,9 @@
+@@ -273,6 +273,11 @@
      int wcFromTo_size;
      struct bidi_cache_entry *pre_bidi_cache, *post_bidi_cache;
      int bidi_cache_size;
++
++    int bracketed_paste;
 +
 +    unsigned long ignore_uchars[IGNORE_CHARS_MAX + 1];
 +    int ignore_length;
  };
  
  #define in_utf(term) ((term)->utf || (term)->ucsdata->line_codepage==CP_UTF8)
-diff -r a5f2d327e10f -r 69d8bf45f3db wcwidth.c
---- a/wcwidth.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/wcwidth.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 unix/uxl10n.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/unix/uxl10n.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -0,0 +1,7 @@
++#include "putty.h"
++
++char *
++l10n_dupstr (char *s)
++{
++  return dupstr (s);
++}
+diff -r b9dfa96f2b06 -r 6555bf286954 unix/uxucs.c
+--- a/unix/uxucs.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/unix/uxucs.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -143,6 +143,7 @@
+      */
+     if (ucsdata->line_codepage == CS_NONE)
+ 	ucsdata->line_codepage = decode_codepage(linecharset);
++    ucsdata->iso2022 = !iso2022_init (&ucsdata->iso2022_data, linecharset, 1);
+ 
+     /*
+      * If line_codepage is _still_ CS_NONE, we assume we're using
+@@ -257,8 +258,29 @@
+ const char *cp_enumerate(int index)
+ {
+     int charset;
++    static const char *cp_add[] = {
++	"UTF-8 (CJK)",
++	"UTF-8 (Non-CJK)",
++
++	"EUC-JP",
++	"ISO-2022-JP",
++	"MS_Kanji",
++	"Shift_JIS",
++	"EUC-KR",
++	"Big5",
++	"EUC-CN",
++
++	"UTF-8/Auto-Detect Japanese",
++	"EUC-JP/Auto-Detect Japanese",
++	"MS_Kanji/Auto-Detect Japanese",
++	"Shift_JIS/Auto-Detect Japanese",
++    };
+     if (index == 0)
+ 	return "Use font encoding";
++    if (index <= sizeof cp_add / sizeof cp_add[0])
++	return cp_add[index - 1];
++    else
++	index -= sizeof cp_add / sizeof cp_add[0];
+     charset = charset_localenc_nth(index-1);
+     if (charset == CS_NONE)
+ 	return NULL;
+@@ -267,6 +289,10 @@
+ 
+ int decode_codepage(char *cp_name)
+ {
++    if (cp_name && *cp_name) {
++	if (!iso2022_init_test (cp_name))
++	    cp_name = "UTF-8";
++    }
+     if (!*cp_name)
+ 	return CS_NONE;		       /* use font encoding */
+     return charset_from_localenc(cp_name);
+diff -r b9dfa96f2b06 -r 6555bf286954 wcwidth.c
+--- a/wcwidth.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/wcwidth.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -50,7 +50,7 @@
   *
   * http://www.unicode.org/unicode/reports/tr11/
@@ -21943,9 +22326,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db wcwidth.c
   * Ambiguous (A) category as defined in Unicode Technical Report #11
   * have a column width of 2. This variant might be useful for users of
   * CJK legacy encodings who want to migrate to UCS without changing
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/Default.isl
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/Default.isl
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/Default.isl	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/Default.isl	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,47 @@
 +[LangOptions]
 +LanguageName=English
@@ -21994,9 +22377,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/Default.isl
 +FinishedRestartMessage=One or more [name] programs are still running.%nSetup will not replace these program files until you restart your computer.%n%nWould you like to restart now?
 +; ...and this comes up if you try to uninstall.
 +UninstalledAndNeedsRestart=One or more %1 programs are still running.%nThe program files will not be removed until your computer is restarted.%n%nWould you like to restart now?
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/Japanese.isl
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/Japanese.isl
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/Japanese.isl	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/Japanese.isl	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,47 @@
 +[LangOptions]
 +LanguageName=Japanese
@@ -22045,682 +22428,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/Japanese.isl
 +FinishedRestartMessage=àÍÇ¬à»è„ÇÃ [name] ÉvÉçÉOÉâÉÄÇ™é¿çsíÜÇ≈Ç∑ÅB%nÉZÉbÉgÉAÉbÉvÉvÉçÉOÉâÉÄÇÕÇ±ÇÃÉRÉìÉsÉÖÅ[É^Ç™çƒãNìÆÇ∑ÇÈÇ‹Ç≈Ç±ÇÍÇÁÇÃÉvÉçÉOÉâÉÄÉtÉ@ÉCÉãÇíuÇ´ä∑Ç¶ÇÈÇ±Ç∆Ç™Ç≈Ç´Ç‹ÇπÇÒÅB%n%nç°Ç∑ÇÆçƒãNìÆÇµÇ‹Ç∑Ç©?
 +; ÇªÇÍÇ©ÇÁÅAÇ±ÇÍÇÕÉAÉìÉCÉìÉXÉgÅ[ÉãÇµÇÊÇ§Ç∆ÇµÇΩÇ∆Ç´Ç…ï\é¶Ç≥ÇÍÇÈÅB
 +UninstalledAndNeedsRestart=àÍÇ¬à»è„ÇÃ %1 ÉvÉçÉOÉâÉÄÇ™é¿çsíÜÇ≈Ç∑ÅB%nÇ±ÇÃÉvÉçÉOÉâÉÄÉtÉ@ÉCÉãÇÕÇ±ÇÃÉRÉìÉsÉÖÅ[É^ÇÃçƒãNìÆéûÇ…çÌèúÇ≥ÇÍÇ‹Ç∑ÅB%n%nç°Ç∑ÇÆçƒãNìÆÇµÇ‹Ç∑Ç©?
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/l10n.c
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pageant.lng
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/l10n.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -0,0 +1,669 @@
-+#include <winsock2.h>
-+#include <windows.h>
-+#include <commctrl.h>
-+#include <string.h>
-+#include <stdio.h>
-+#include "putty.h"
-+
-+static char lngfile[MAX_PATH];
-+static char lang[32];
-+static char ofontname[128];
-+static HFONT hfont;
-+static char x[1024];
-+static WNDPROC orig_wndproc_button, orig_wndproc_static,
-+  orig_wndproc_systreeview32, orig_wndproc_edit, orig_wndproc_listbox, orig_wndproc_combobox;
-+static int collect = 0;
-+static BOOL CALLBACK
-+defdlgproc (HWND a1, UINT a2, WPARAM a3, LPARAM a4)
-+{
-+  return 0;
-+}
-+struct prop
-+{
-+  WNDPROC oldproc;
-+  DLGPROC olddlgproc;
-+} defaultprop = { DefWindowProc, defdlgproc };
-+static char propstr[] = "l10n";
-+static DLGPROC lastolddlgproc;
-+
-+#define HOOK_TREEVIEW "xSysTreeView32"
-+
-+static char *
-+aa (char *p)
-+{
-+  int i, n;
-+
-+  n = strlen (p);
-+  for (i = 0 ; i < 1023 && *p ; i++)
-+    {
-+      if (i == 0 && *p == ' ' || (*p > 0 && *p < 32) || *p == '=' || *p == '%')
-+	{
-+	  x[i++] = '%';
-+	  x[i++] = "0123456789ABCDEF"[(*p>>4)&15];
-+	  x[i] = (*p++&15)["0123456789ABCDEF"];
-+	}
-+      else
-+	x[i] = *p++;
-+    }
-+  if (i > 0 && x[i - 1] == ' ') {
-+      x[i - 1] = '%';
-+      x[i++] = '2';
-+      x[i++] = '0';
-+  }
-+  x[i] = '\0';
-+  return x;
-+}
-+
-+static DWORD
-+getl10nstr (char *a, char *b, char *c, int n)
-+{
-+  DWORD r;
-+
-+  {
-+    char* p = a;
-+    while (*p != '\0') {
-+      if (IsDBCSLeadByte(*p)) {
-+        strncpy(c, b, n);
-+        c[n - 1] = '\0';
-+        return strlen(c);
-+      }
-+      p++;
-+    }
-+  }
-+
-+  r = GetPrivateProfileString (lang, aa (a), "\n:", c, n, lngfile);
-+  if (c[0] == '\n') {
-+      if (collect > 0 && (int) strlen(a) > collect) {
-+          char buf[1024];
-+          strcpy(buf, x);
-+          WritePrivateProfileString(lang, buf, aa(b), lngfile);
-+      }
-+      strncpy(c, b, n);
-+      c[n - 1] = '\0';
-+      return strlen(c);
-+  }
-+  for (a = c ; (*a = *c) ; a++, c++)
-+    {
-+      if (*c == '%')
-+	{
-+	  int d, e;
-+
-+	  if (c[1] >= '0' && c[1] <= '9')
-+	    d = c[1] - '0';
-+	  else if (c[1] >= 'A' && c[1] <= 'F')
-+	    d = c[1] - 'A' + 10;
-+	  else
-+	    continue;
-+	  if (c[2] >= '0' && c[2] <= '9')
-+	    e = c[2] - '0';
-+	  else if (c[2] >= 'A' && c[2] <= 'F')
-+	    e = c[2] - 'A' + 10;
-+	  else
-+	    continue;
-+	  *a = d * 16 + e;
-+	  c += 2;
-+	}
-+    }
-+  return r;
-+}
-+
-+static void
-+domenu (HMENU menu)
-+{
-+  int i, n;
-+  char a[256];
-+  MENUITEMINFO b;
-+
-+  n = GetMenuItemCount (menu);
-+  for (i = 0 ; i < n ; i++)
-+    {
-+      b.cbSize = sizeof (MENUITEMINFO);
-+      b.fMask = MIIM_TYPE;
-+      b.dwTypeData = a;
-+      b.cch = 256;
-+      if (GetMenuItemInfo (menu, i, 1, &b))
-+	if (getl10nstr (a, "", a, 256))
-+	  SetMenuItemInfo (menu, i, 1, &b);
-+    }
-+}
-+
-+static LRESULT CALLBACK
-+wndproc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+  struct prop *p;
-+
-+  p = GetProp (hwnd, propstr);
-+  if (!p)
-+    p = &defaultprop;
-+  proc = p->oldproc;
-+  switch (msg)
-+    {
-+    case WM_DESTROY:
-+      RemoveProp (hwnd, propstr);
-+      LocalFree ((HANDLE)p);
-+      SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR)proc);
-+      break;
-+    case WM_INITMENUPOPUP:
-+      domenu ((HMENU)wparam);
-+      break;
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT
-+hook_setfont (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  LOGFONT a;
-+
-+  if (wparam && GetObject ((HGDIOBJ)wparam, sizeof (a), &a))
-+    {
-+      if (!stricmp (a.lfFaceName, ofontname))
-+	return CallWindowProc (proc, hwnd, msg, (WPARAM)hfont, lparam);
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT
-+hook_create (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  char a[256], b[256];
-+  LRESULT r;
-+
-+  r = CallWindowProc (proc, hwnd, msg, (WPARAM)hfont, lparam);
-+  if (GetWindowText (hwnd, a, 256))
-+    if (getl10nstr (a, "", b, 256))
-+      SetWindowText (hwnd, b);
-+  return r;
-+}
-+
-+static LRESULT
-+hook_tvm_insertitem (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  TVINSERTSTRUCT *p;
-+  char *q;
-+  char a[256];
-+  LRESULT r;
-+
-+  p = (TVINSERTSTRUCT *)lparam;
-+  q = p->item.pszText;
-+  if (getl10nstr (q, "", a, 256))
-+    p->item.pszText = a;
-+  r = CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+  p->item.pszText = q;
-+  return r;
-+}
-+
-+static LRESULT
-+hook_tvm_getitem (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  TVITEM *p;
-+  char *q;
-+  char a[256];
-+  int l;
-+  LRESULT r;
-+
-+  p = (TVITEM *)lparam;
-+  q = p->pszText;
-+  l = p->cchTextMax;
-+  p->pszText = a;
-+  p->cchTextMax = 256;
-+  r = CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+  p->pszText = q;
-+  p->cchTextMax = l;
-+  getl10nstr (a, a, a, 256);
-+  strncpy (q, a, l);
-+  return r;
-+}
-+
-+static LRESULT CALLBACK
-+wndproc_button (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+
-+  proc = orig_wndproc_button;
-+  switch (msg)
-+    {
-+    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
-+    case WM_CREATE: return hook_create (proc, hwnd, msg, wparam, lparam);
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT CALLBACK
-+wndproc_static (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+
-+  proc = orig_wndproc_static;
-+  switch (msg)
-+    {
-+    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
-+    case WM_CREATE: return hook_create (proc, hwnd, msg, wparam, lparam);
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT CALLBACK
-+wndproc_systreeview32 (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+
-+  proc = orig_wndproc_systreeview32;
-+  switch (msg)
-+    {
-+    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
-+    case TVM_INSERTITEM: return hook_tvm_insertitem (proc, hwnd, msg, wparam, lparam);
-+    case TVM_GETITEM: return hook_tvm_getitem (proc, hwnd, msg, wparam, lparam);
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT CALLBACK
-+wndproc_edit (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+
-+  proc = orig_wndproc_edit;
-+  switch (msg)
-+    {
-+    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT CALLBACK
-+wndproc_listbox (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+
-+  proc = orig_wndproc_listbox;
-+  switch (msg)
-+    {
-+    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
-+    case LB_ADDSTRING:
-+        {
-+          char buffer[256];
-+          char* text = (char*) lparam;
-+          if (getl10nstr (text, "", buffer, 256))
-+              text = buffer;
-+          return CallWindowProc (proc, hwnd, msg, wparam, (LPARAM) text);
-+        }
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static LRESULT CALLBACK
-+wndproc_combobox (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-+{
-+  WNDPROC proc;
-+
-+  proc = orig_wndproc_combobox;
-+  switch (msg)
-+    {
-+    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
-+    case CB_ADDSTRING:
-+        {
-+          char buffer[256];
-+          char* text = (char*) lparam;
-+          if (getl10nstr (text, "", buffer, 256))
-+              text = buffer;
-+          return CallWindowProc (proc, hwnd, msg, wparam, (LPARAM) text);
-+        }
-+    }
-+  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
-+}
-+
-+static int getEnabled ()
-+{
-+  static int enabled = -1;
-+  if (enabled == -1)
-+    {
-+  int i;
-+  char fontname[128];
-+  int fontsize;
-+  struct
-+  {
-+    char *classname;
-+    char *newclassname;
-+    WNDPROC *orig_wndproc;
-+    WNDPROC new_wndproc;
-+  } b[] =
-+    {
-+      { "Button", "xButton", &orig_wndproc_button, wndproc_button },
-+      { "Static", "xStatic", &orig_wndproc_static, wndproc_static },
-+      { WC_TREEVIEW, HOOK_TREEVIEW, &orig_wndproc_systreeview32, wndproc_systreeview32 },
-+      { "Edit", "xEdit", &orig_wndproc_edit, wndproc_edit },
-+      { "ListBox", "xListBox", &orig_wndproc_listbox, wndproc_listbox },
-+      { "ComboBox", "xComboBox", &orig_wndproc_combobox, wndproc_combobox },
-+      { NULL }
-+    };
-+
-+  enabled = 0;
-+  GetModuleFileName (0, lngfile, MAX_PATH);
-+  for (i = strlen (lngfile) ; i >= 0 ; i--)
-+    if (lngfile[i] == '.')
-+      break;
-+  if (i >= 0)
-+    {
-+      strcpy (&lngfile[i + 1], "lng");
-+      if (GetPrivateProfileString ("Default", "Language", "", lang, 32,
-+				   lngfile))
-+	{
-+	  enabled = 1;
-+	  GetPrivateProfileString (lang, "_FONTNAME_", "System", fontname, 128,
-+				   lngfile);
-+	  GetPrivateProfileString (lang, "_OFONTNAME_", "MS Sans Serif",
-+				   ofontname, 128, lngfile);
-+	  fontsize = GetPrivateProfileInt(lang, "_FONTSIZE_", 10, lngfile);
-+	  hfont = CreateFont (fontsize, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET,
-+			      0, 0, 0, 0, fontname);
-+	  for (i = 0; b[i].classname != NULL; i++)
-+	    {
-+	      WNDCLASS wndclass;
-+	      HINSTANCE hinst = GetModuleHandle(NULL);
-+
-+	      GetClassInfo (hinst, b[i].classname, &wndclass);
-+	      wndclass.hInstance = hinst;
-+	      wndclass.lpszClassName = b[i].newclassname;
-+	      *b[i].orig_wndproc = wndclass.lpfnWndProc;
-+	      wndclass.lpfnWndProc = b[i].new_wndproc;
-+	      RegisterClass (&wndclass);
-+	    }
-+	  collect = GetPrivateProfileInt(lang, "_COLLECT_", 0, lngfile);
-+	}
-+    }
-+  }
-+  return enabled;
-+}
-+
-+int get_l10n_setting(const char* keyname, char* buf, int size)
-+{
-+    if (getEnabled()) {
-+        GetPrivateProfileString (lang, keyname, "\n:", buf, size, lngfile);
-+        if (*buf != '\n')
-+            return 1;
-+    }
-+    *buf = '\0';
-+    return 0;
-+}
-+
-+static HWND
-+aftercreate (HWND r)
-+{
-+  char classname[256];
-+  char windowname[256];
-+  DWORD style;
-+  HWND parent;
-+  struct prop *qq;
-+  char buf[256];
-+  enum { TYPE_OFF, TYPE_MAIN, TYPE_OTHER } type;
-+
-+  if (!r)
-+    return r;
-+  GetClassName (r, classname, 256);
-+  GetWindowText (r, windowname, 256);
-+  style = GetWindowLong (r, GWL_STYLE);
-+  parent = GetParent (r);
-+  type = TYPE_OFF;
-+  if (!(style & WS_CHILD))
-+    {
-+      if (!strcmp (classname, "PuTTY"))
-+	type = TYPE_MAIN;
-+      else if (getl10nstr (windowname, "", buf, 256))
-+	type = TYPE_OTHER;
-+    }
-+  if (type == TYPE_OFF)
-+    return r;
-+  if (type == TYPE_OTHER)
-+    {
-+      if (GetWindowText (r, buf, 256))
-+	if (getl10nstr (buf, "", buf, 256))
-+	  SetWindowText (r, buf);
-+    }
-+  if (type == TYPE_MAIN)
-+    do
-+      {
-+	qq = (struct prop *)LocalAlloc (0, sizeof (*qq));
-+	if (!qq)
-+	  break;
-+	if (!SetProp (r, propstr, (HANDLE)qq))
-+	  {
-+	    LocalFree ((HANDLE)qq);
-+	    break;
-+	  }
-+	memset(qq, 0, sizeof (*qq));
-+	qq->oldproc = (WNDPROC)SetWindowLongPtr (r, GWLP_WNDPROC,
-+						 (LONG_PTR)wndproc);
-+      }
-+    while (0);
-+  return r;
-+}
-+
-+static void
-+aftercreate2 (HWND hwnd)
-+{
-+  HWND a;
-+  LOGFONT l;
-+  char buf[256];
-+
-+  a = GetWindow (hwnd, GW_CHILD);
-+  while (a)
-+    {
-+      aftercreate2 (a);
-+      if (GetWindowText (a, buf, 256))
-+	if (getl10nstr (buf, "", buf, 256))
-+	  SetWindowText (a, buf);
-+      if (GetObject ((HGDIOBJ)SendMessage (a, WM_GETFONT, 0, 0),
-+		     sizeof (l), &l))
-+	{
-+	  if (!stricmp (l.lfFaceName, ofontname))
-+	    SendMessage (a, WM_SETFONT, (WPARAM)hfont,
-+			 MAKELPARAM (TRUE, 0));
-+	}
-+      a = GetWindow (a, GW_HWNDNEXT);
-+    }
-+}
-+
-+static BOOL CALLBACK
-+dlgproc (HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
-+{
-+  DLGPROC proc;
-+  struct prop *p;
-+
-+  if (message == WM_INITDIALOG)
-+    {
-+      aftercreate (hwnd);
-+      aftercreate2 (hwnd);
-+      p = (struct prop *)LocalAlloc (0, sizeof (*p));
-+      if (p && !SetProp (hwnd, propstr, (HANDLE)p))
-+	LocalFree ((HANDLE)p);
-+      else
-+	*p = defaultprop;
-+    }
-+  p = GetProp (hwnd, propstr);
-+  if (!p)
-+    p = &defaultprop;
-+  if (message == WM_INITDIALOG)
-+    p->olddlgproc = lastolddlgproc;
-+  proc = p->olddlgproc;
-+  return proc (hwnd, message, wparam, lparam);
-+}
-+
-+#undef MessageBoxA
-+int
-+xMessageBoxA (HWND a1, LPCSTR a2, LPCSTR a3, UINT a4)
-+{
-+  char *b2 = (char *)a2, *b3 = (char *)a3;
-+  char c2[256], c3[256];
-+
-+  if (!getEnabled())
-+    return MessageBoxA (a1, a2, a3, a4);
-+  if (getl10nstr (b2, "", c2, 256))
-+    b2 = c2;
-+  if (getl10nstr (b3, "", c3, 256))
-+    b3 = c3;
-+  return MessageBoxA (a1, b2, b3, a4);
-+}
-+
-+#undef CreateWindowExA
-+HWND
-+xCreateWindowExA (DWORD a1, LPCSTR a2, LPCSTR a3, DWORD a4, int a5, int a6,
-+		 int a7, int a8, HWND a9, HMENU a10, HINSTANCE a11, LPVOID a12)
-+{
-+  HWND r;
-+
-+  if (getEnabled() && IsBadStringPtr (a2, 100) == FALSE)
-+    {
-+      if (stricmp (a2, WC_TREEVIEW) == 0) a2 = HOOK_TREEVIEW;
-+      else if (stricmp (a2, "Button") == 0) a2 = "xButton";
-+      else if (stricmp (a2, "Static") == 0) a2 = "xStatic";
-+      else if (stricmp (a2, "Edit") == 0) a2 = "xEdit";
-+      else if (stricmp (a2, "ListBox") == 0) a2 = "xListBox";
-+      else if (stricmp (a2, "ComboBox") == 0) a2 = "xComboBox";
-+    }
-+  r = CreateWindowExA (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
-+  if (!getEnabled())
-+    return r;
-+  return aftercreate (r);
-+}
-+
-+#undef DialogBoxParamA
-+int
-+xDialogBoxParamA (HINSTANCE a1, LPCSTR a2, HWND a3, DLGPROC a4, LPARAM a5)
-+{
-+  if (!getEnabled())
-+    return DialogBoxParamA (a1, a2, a3, a4, a5);
-+  lastolddlgproc = a4;
-+  return DialogBoxParamA (a1, a2, a3, dlgproc, a5);
-+}
-+
-+#undef CreateDialogParamA
-+HWND
-+xCreateDialogParamA (HINSTANCE a1, LPCSTR a2, HWND a3, DLGPROC a4, LPARAM a5)
-+{
-+  HWND r;
-+
-+  r = CreateDialogParamA (a1, a2, a3, a4, a5);
-+  if (getEnabled())
-+    {
-+      aftercreate (r);
-+      aftercreate2 (r);
-+    }
-+  return r;
-+}
-+
-+char *
-+l10n_dupstr (char *s)
-+{
-+  char *a = s;
-+  char b[256];
-+
-+  if (getEnabled() && getl10nstr (s, "", b, 256))
-+    a = b;
-+  return dupstr (a);
-+}
-+
-+void
-+l10n_created_window (HWND hwnd)
-+{
-+  if (getEnabled())
-+    aftercreate2 (hwnd);
-+}
-+
-+HFONT
-+l10n_getfont (HFONT f)
-+{
-+  LOGFONT l;
-+
-+  if (getEnabled() && GetObject ((HGDIOBJ)f, sizeof (l), &l))
-+    {
-+      if (!stricmp (l.lfFaceName, ofontname))
-+	return hfont;
-+    }
-+  return f;
-+}
-+
-+int xsprintf(char* buffer, const char* format, ...)
-+{
-+  int r;
-+  char format2[1024];
-+  va_list args;
-+  va_start(args, format);
-+  if (getEnabled())
-+    {
-+      if (getl10nstr((char*) format, "", format2, 1024))
-+        format = format2;
-+    }
-+  r = vsprintf(buffer, format, args);
-+  va_end(args);
-+  return r;
-+}
-+
-+#ifdef _WINDOWS
-+#undef _vsnprintf
-+#define vsnprintf _vsnprintf
-+#else
-+#undef vsnprintf
-+#endif
-+int xvsnprintf(char* buffer, int size, const char* format, va_list args)
-+{
-+  char format2[1024];
-+  if (getEnabled())
-+    {
-+      if (getl10nstr((char*) format, "", format2, 1024))
-+        format = format2;
-+    }
-+  return vsnprintf(buffer, size, format, args);
-+}
-+
-+static int getOpenSaveFilename(OPENFILENAME* ofn, int (WINAPI *f)(OPENFILENAME*)) {
-+  char buft[256];
-+  char bufft[256];
-+  char buff[256];
-+  if (getEnabled())
-+    {
-+      if (ofn->lpstrTitle != NULL)
-+        {
-+          if (getl10nstr((char*) ofn->lpstrTitle, "", buft, 256))
-+            ofn->lpstrTitle = buft;
-+        }
-+      if (ofn->lpstrFileTitle != NULL)
-+        {
-+          if (getl10nstr((char*) ofn->lpstrFileTitle, "", bufft, 256))
-+            ofn->lpstrFileTitle = bufft;
-+        }
-+      if (ofn->lpstrFilter != NULL)
-+        {
-+          if (getl10nstr((char*) ofn->lpstrFilter, "", buff, 256))
-+            ofn->lpstrFilter = buff;
-+        }
-+    }
-+  return f(ofn);
-+}
-+
-+#undef GetOpenFileNameA
-+int xGetOpenFileNameA(OPENFILENAMEA* ofn)
-+{
-+  return getOpenSaveFilename(ofn, GetOpenFileNameA);
-+}
-+
-+#undef GetSaveFileNameA
-+int xGetSaveFileNameA(OPENFILENAMEA* ofn)
-+{
-+  return getOpenSaveFilename(ofn, GetSaveFileNameA);
-+}
-+
-+BOOL l10nSetDlgItemText(HWND dialog, int id, LPCSTR text) {
-+	char buf[256];
-+	if (getl10nstr((char*) text, "", buf, 256))
-+		text = buf;
-+	return SetDlgItemText(dialog, id, text);
-+}
-+
-+BOOL l10nAppendMenu(HMENU menu, UINT flags, UINT id, LPCSTR text) {
-+	char buf[256];
-+	if (getl10nstr((char*) text, "", buf, 256))
-+		text = buf;
-+	return AppendMenu(menu, flags, id, text);
-+}
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pageant.lng
---- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/pageant.lng	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/pageant.lng	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,51 @@
 +[Default]
 +Language=Japanese
@@ -22773,9 +22483,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pageant.lng
 +Accept deletion of the following key?=éüÇÃåÆÇÃçÌèúÇãñâ¬ÇµÇ‹Ç∑Ç©?
 +Accept deletion of all SSH1 identities?=ëSÇƒÇÃSSH1éØï èÓïÒÇÃçÌèúÇãñâ¬ÇµÇ‹Ç∑Ç©?
 +Accept deletion of all SSH2 identities?=ëSÇƒÇÃSSH2éØï èÓïÒÇÃçÌèúÇãñâ¬ÇµÇ‹Ç∑Ç©?
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pageant.mft
---- a/windows/pageant.mft	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/pageant.mft	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pageant.mft
+--- a/windows/pageant.mft	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/pageant.mft	Mon Jan 30 23:51:03 2012 +0900
 @@ -5,7 +5,7 @@
  <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
  <assemblyIdentity
@@ -22794,9 +22504,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pageant.mft
     </dependentAssembly>
     </dependency>
     <!-- Declare us to be "DPI-aware". -->
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pageant.rc
---- a/windows/pageant.rc	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/pageant.rc	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pageant.rc
+--- a/windows/pageant.rc	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/pageant.rc	Mon Jan 30 23:51:03 2012 +0900
 @@ -10,7 +10,7 @@
  200 ICON "pageant.ico"
  201 ICON "pageants.ico"
@@ -22838,9 +22548,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pageant.rc
  #include "version.rc2"
  
  #ifndef NO_MANIFESTS
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.c
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pfwd.c
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/pfwd.c	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/pfwd.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,1161 @@
 +/*
 + * PLink - a command-line (stdin/stdout) variant of PuTTY.
@@ -24003,9 +23713,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.c
 +
 +    return 0;
 +}
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.lng
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pfwd.lng
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/pfwd.lng	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/pfwd.lng	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,26 @@
 +[Default]
 +Language=Japanese
@@ -24033,9 +23743,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.lng
 +&Details <<=è⁄ç◊(&D) <<
 +%25.90s@%25.90s's password:%20=%25.90s@%25.90sÇÃÉpÉXÉèÅ[Éh:%20
 +Passphrase for key "%25.100s":%20="%25.100s"ÇÃåÆÇÃÉpÉXÉtÉåÅ[ÉY:%20
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.mft
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pfwd.mft
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/pfwd.mft	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/pfwd.mft	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,19 @@
 +<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 +<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
@@ -24056,9 +23766,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.mft
 +   </dependentAssembly>
 +   </dependency>
 +</assembly>
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.rc
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pfwd.rc
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/pfwd.rc	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/pfwd.rc	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,58 @@
 +#include "rcstuff.h"
 +
@@ -24118,9 +23828,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd.rc
 +1 RT_MANIFEST "pfwd.mft"
 +
 +#include "version.rc2"
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd_sample.ini
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/pfwd_sample.ini
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/pfwd_sample.ini	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/pfwd_sample.ini	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,68 @@
 +[SSH]
 +; SSHÉTÅ[ÉoÅ[ÉAÉhÉåÉX
@@ -24190,9 +23900,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/pfwd_sample.ini
 +; HOST4 Dynamic Forwarding
 +;=================================================
 +05=D1080
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/plinkw.lng
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/plinkw.lng
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/plinkw.lng	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/plinkw.lng	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,38 @@
 +[Default]
 +Language=Japanese
@@ -24232,9 +23942,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/plinkw.lng
 +%25s (close automatically soon...)=%25s (Ç‹Ç‡Ç»Ç≠é©ìÆìIÇ…èIóπÇµÇ‹Ç∑)
 +%25s (disconnected)=%25s (êÿíf)
 +login as:%20=ÉçÉOÉCÉìñº:
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/plinkw.rc
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/plinkw.rc
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/plinkw.rc	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/plinkw.rc	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,27 @@
 +#include "rcstuff.h"
 +
@@ -24263,10 +23973,10 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/plinkw.rc
 +1 RT_MANIFEST "putty.mft"
 +
 +#include "version.rc2"
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/putty.lng
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/putty.lng
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/putty.lng	Thu Dec 29 18:25:25 2011 +0900
-@@ -0,0 +1,534 @@
++++ b/windows/putty.lng	Mon Jan 30 23:51:03 2012 +0900
+@@ -0,0 +1,539 @@
 +[Default]
 +Language=Japanese
 +
@@ -24706,20 +24416,25 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/putty.lng
 +ClearType=ÉNÉäÉAÉ^ÉCÉv
 +Default=ÉfÉtÉHÉãÉg
 +Remote terminal settings=ÉäÉÇÅ[Égí[ññê›íË
++Background=îwåi
++Options controlling background=îwåiÇÃÉIÉvÉVÉáÉì
++Effect:=å¯â 
++Wallpaper:=ï«éÜ
 +Wallpaper=ï«éÜ
-+Options controlling wallpaper=ï«éÜÇÃÉIÉvÉVÉáÉì
-+Transparent background mode=îwåiìßâﬂÉÇÅ[Éh
-+Disable=ñ≥å¯
-+Like transparent xterms=xtermsïóìßâﬂ
-+Use bitmap file=ÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉãÇégóp
-+Adjust transparency=ìßâﬂó¶ÇÃí≤êÆ
-+Alpha value of bg image (0 - 255) :=îwåiâÊëúÇÃÉAÉãÉtÉ@íl (0 - 255) :
-+Use bitmap file mode settings=ÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉãégópÉÇÅ[ÉhÇ≈ÇÃê›íË
-+Use AlphaBlending=ÉAÉãÉtÉ@ÉuÉåÉìÉfÉBÉìÉOÇégóp
-+Stopped to draw when moving=à⁄ìÆéûÇ…ÇÕï`âÊÇµÇ»Ç¢
-+Bitmap file used for background :=îwåiÇ…égópÇ∑ÇÈÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉã
-+Select bitmap file for background=îwåiópÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉãÇÃëIë
-+Bmp Files (*.bmp)=ÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉã (*.bmp)%00*.BMP%00ëSÇƒÇÃÉtÉ@ÉCÉã (*.*)%00*%00
++None=Ç»Çµ
++Bitmap file=ÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉã
++Bitmap file on Desktop=ÉrÉbÉgÉ}ÉbÉv(ÉfÉXÉNÉgÉbÉv))
++Desktop=ÉfÉXÉNÉgÉbÉv
++Bitmap file:=ÉrÉbÉgÉ}ÉbÉvÉtÉ@ÉCÉã
++Draw while moving/resizing=à⁄ìÆ/ÉäÉTÉCÉYíÜÇ…ï`âÊ
++Position:=îzíu
++Horizontal Align:=êÖïΩà íu
++Vertical Align:=êÇíºà íu
++Transparency=îºìßñæ
++Options controlling transparency=îºìßñæÇÃÉIÉvÉVÉáÉì
++Default Background Alpha Value 0-100=ïWèÄÇÃîwåiÇÃÉAÉãÉtÉ@íl 0-100
++Active Window=ÉAÉNÉeÉBÉuÉEÉBÉìÉhÉE
++Inactive Window=îÒÉAÉNÉeÉBÉuÉEÉBÉìÉhÉE
 +Select private key file=îÈñßåÆÉtÉ@ÉCÉãÇÃëIë
 +PuTTY Private Key Files (*.ppk)=PuTTY îÈñßåÆÉtÉ@ÉCÉã (*.ppk)%00*.PPK%00ëSÇƒÇÃÉtÉ@ÉCÉã (*.*)%00*%00
 +Select bell sound file=ÉxÉãópÉTÉEÉìÉhÉtÉ@ÉCÉãÇëIë
@@ -24801,9 +24516,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/putty.lng
 +Underline hyperlinks:=ÉnÉCÉpÅ[ÉäÉìÉNÇÃÉAÉìÉ_Å[ÉâÉCÉìï\é¶
 +When hovered upon=É}ÉEÉXÉIÅ[ÉoÅ[
 +Press Ctrl to click hyperlinks=ÉNÉäÉbÉNÇ∑ÇÈÇ∆Ç´Ç…CtrlÉLÅ[Ç™ïKóv
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/putty.mft
---- a/windows/putty.mft	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/putty.mft	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/putty.mft
+--- a/windows/putty.mft	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/putty.mft	Mon Jan 30 23:51:03 2012 +0900
 @@ -5,7 +5,7 @@
  <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
  <assemblyIdentity
@@ -24822,18 +24537,31 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/putty.mft
     </dependentAssembly>
     </dependency>
     <!-- Declare us to be "DPI-aware". -->
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/putty_sample.ini
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/putty.rc
+--- a/windows/putty.rc	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/putty.rc	Mon Jan 30 23:51:03 2012 +0900
+@@ -3,7 +3,9 @@
+ #define APPNAME "PuTTY"
+ #define APPDESC "SSH, Telnet and Rlogin client"
+ 
++#pragma code_page(65001)
+ #include "win_res.rc2"
++#pragma code_page(DEFAULT)
+ 
+ #ifndef NO_MANIFESTS
+ 1 RT_MANIFEST "putty.mft"
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/putty_sample.ini
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/putty_sample.ini	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/putty_sample.ini	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,3 @@
 +[Generic]
 +UseIniFile=1
 +
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttyd.ico
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/puttyd.ico
 Binary file windows/puttyd.ico has changed
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttygen.lng
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/puttygen.lng
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/puttygen.lng	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/puttygen.lng	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,70 @@
 +[Default]
 +Language=Japanese
@@ -24905,9 +24633,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttygen.lng
 +All Files (*.*)=ëSÇƒÇÃÉtÉ@ÉCÉã (*.*)%00*%00%00%00
 +Successfully imported foreign key%0A(%25s).%0ATo use this key with PuTTY, you need to%0Ause the "Save private key" command to%0Asave it in PuTTY's own format.=äOïîÇÃåÆÇÃÉCÉìÉ|Å[ÉgÇ…ê¨å˜ÇµÇ‹ÇµÇΩ%0A(%25s)ÅB%0AÇ±ÇÃåÆÇPuTTYÇ≈óòópÇ∑ÇÈÇΩÇﬂÇ…ÇÕÅuîÈñßåÆÇÃï€ë∂ÅvÇ≈%0APuTTYópÇÃåÆÇ∆ÇµÇƒï€ë∂Ç∑ÇÈïKóvÇ™Ç†ÇËÇ‹Ç∑ÅB
 +Cannot export an SSH%25d key in an SSH%25d format=SSH%25dÇÃåÆÇÕSSH%25då`éÆÇ…ÉGÉNÉXÉ|Å[ÉgèoóàÇ‹ÇπÇÒÅB
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttygen.mft
---- a/windows/puttygen.mft	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/puttygen.mft	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/puttygen.mft
+--- a/windows/puttygen.mft	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/puttygen.mft	Mon Jan 30 23:51:03 2012 +0900
 @@ -5,7 +5,7 @@
  <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
  <assemblyIdentity
@@ -24926,9 +24654,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttygen.mft
     </dependentAssembly>
     </dependency>
     <!-- Declare us to be "DPI-aware". -->
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttygen.rc
---- a/windows/puttygen.rc	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/puttygen.rc	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/puttygen.rc
+--- a/windows/puttygen.rc	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/puttygen.rc	Mon Jan 30 23:51:03 2012 +0900
 @@ -9,7 +9,7 @@
  
  200 ICON "puttygen.ico"
@@ -24938,9 +24666,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttygen.rc
  STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
  CAPTION "PuTTY Key Generator"
  FONT 8, "MS Shell Dlg"
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttytel.lng
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/puttytel.lng
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/puttytel.lng	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/puttytel.lng	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,551 @@
 +[Default]
 +Language=Japanese
@@ -25493,10 +25221,22 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/puttytel.lng
 +&Flow control=ÉtÉçÅ[êßå‰(&F)
 +Configure the serial line=ÉVÉäÉAÉãê⁄ë±ÇÃê›íË
 +Icon=ÉAÉCÉRÉì
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/win_res.rc2
---- a/windows/win_res.rc2	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/win_res.rc2	Thu Dec 29 18:25:25 2011 +0900
-@@ -19,7 +19,7 @@
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/version.rc2
+--- a/windows/version.rc2	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/version.rc2	Mon Jan 30 23:51:03 2012 +0900
+@@ -120,7 +120,7 @@
+ 	    VALUE "OriginalFilename",	APPNAME
+ 	    VALUE "FileVersion",	VERSION_TEXT
+ 	    VALUE "ProductVersion",	VERSION_TEXT
+-	    VALUE "LegalCopyright",	"Copyright \251 1997-2011 Simon Tatham."
++	    VALUE "LegalCopyright",	"Copyright ¬© 1997-2011 Simon Tatham."
+ #if (!defined SNAPSHOT) && (!defined RELEASE)
+ 	    /* Only if VS_FF_PRIVATEBUILD. */
+ 	    VALUE "PrivateBuild",	VERSION_TEXT /* NBI */
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/win_res.rc2
+--- a/windows/win_res.rc2	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/win_res.rc2	Mon Jan 30 23:51:03 2012 +0900
+@@ -19,22 +19,22 @@
  IDD_ABOUTBOX DIALOG DISCARDABLE 140, 40, 214, 70
  STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
  CAPTION "About PuTTY"
@@ -25505,7 +25245,12 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/win_res.rc2
  BEGIN
      DEFPUSHBUTTON "&Close", IDOK, 160, 52, 48, 14
      PUSHBUTTON "View &Licence", IDA_LICENCE, 6, 52, 70, 14
-@@ -31,10 +31,10 @@
+     PUSHBUTTON "Visit &Web Site", IDA_WEB, 84, 52, 70, 14
+     CTEXT "PuTTY", IDA_TEXT1, 10, 6, 194, 8
+     CTEXT "", IDA_VERSION, 10, 16, 194, 16
+-    CTEXT "\251 1997-2011 Simon Tatham. All rights reserved.",
++    CTEXT "¬© 1997-2011 Simon Tatham. All rights reserved.",
+           IDA_TEXT2, 10, 34, 194, 16
  END
  
  /* Accelerators used: aco */
@@ -25527,18 +25272,77 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/win_res.rc2
  BEGIN
      DEFPUSHBUTTON "&Close", IDOK, 135, 102, 44, 14
      PUSHBUTTON "C&opy", IDN_COPY, 81, 102, 44, 14
-@@ -54,7 +54,7 @@
- IDD_LICENCEBOX DIALOG DISCARDABLE 50, 50, 226, 263
+@@ -51,41 +51,43 @@
+ END
+ 
+ /* No accelerators used */
+-IDD_LICENCEBOX DIALOG DISCARDABLE 50, 50, 226, 263
++IDD_LICENCEBOX DIALOG DISCARDABLE 50, 50, 226, 279
  STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
  CAPTION "PuTTY Licence"
 -FONT 8, "MS Shell Dlg"
 +FONT 9, "MS Shell Dlg"
  BEGIN
-     DEFPUSHBUTTON "OK", IDOK, 98, 243, 44, 14
+-    DEFPUSHBUTTON "OK", IDOK, 98, 243, 44, 14
++    DEFPUSHBUTTON "OK", IDOK, 98, 259, 44, 14
  
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincfg.c
---- a/windows/wincfg.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/wincfg.c	Thu Dec 29 18:25:25 2011 +0900
+-    LTEXT "Copyright \251 1997-2011 Simon Tatham", 1000, 10, 10, 206, 8
++    LTEXT "Copyright ¬© 1997-2011 Simon Tatham", 1000, 10, 10, 206, 8
+ 
+     LTEXT "Portions copyright Robert de Bath, Joris van Rantwijk, Delian", 1001, 10, 26, 206, 8
+     LTEXT "Delchev, Andreas Schultz, Jeroen Massar, Wez Furlong, Nicolas", 1002, 10, 34, 206, 8
+     LTEXT "Barry, Justin Bradford, Ben Harris, Malcolm Smith, Ahmad Khalifa,", 1003, 10, 42, 206, 8
+-    LTEXT "Markus Kuhn, Colin Watson, and CORE SDI S.A.", 1004, 10, 50, 206, 8
++    LTEXT "Markus Kuhn, Colin Watson, CORE SDI S.A., warp13,", 1004, 10, 50, 206, 8
++    LTEXT "Hideki EIRAKU, Ëõ≠Â≠êÂ±ã ÂèåÂÖ≠, Yoshida Masato,", 1024, 10, 58, 206, 8
++    LTEXT "and MATSUI Nag.", 1025, 10, 66, 206, 8
+ 
+-    LTEXT "Permission is hereby granted, free of charge, to any person", 1005, 10, 66, 206, 8
+-    LTEXT "obtaining a copy of this software and associated documentation", 1006, 10, 74, 206, 8
+-    LTEXT "files (the ""Software""), to deal in the Software without restriction,", 1007, 10, 82, 206, 8
+-    LTEXT "including without limitation the rights to use, copy, modify, merge,", 1008, 10, 90, 206, 8
+-    LTEXT "publish, distribute, sublicense, and/or sell copies of the Software,", 1009, 10, 98, 206, 8
+-    LTEXT "and to permit persons to whom the Software is furnished to do so,", 1010, 10, 106, 206, 8
+-    LTEXT "subject to the following conditions:", 1011, 10, 114, 206, 8
++    LTEXT "Permission is hereby granted, free of charge, to any person", 1005, 10, 82, 206, 8
++    LTEXT "obtaining a copy of this software and associated documentation", 1006, 10, 90, 206, 8
++    LTEXT "files (the ""Software""), to deal in the Software without restriction,", 1007, 10, 98, 206, 8
++    LTEXT "including without limitation the rights to use, copy, modify, merge,", 1008, 10, 106, 206, 8
++    LTEXT "publish, distribute, sublicense, and/or sell copies of the Software,", 1009, 10, 114, 206, 8
++    LTEXT "and to permit persons to whom the Software is furnished to do so,", 1010, 10, 122, 206, 8
++    LTEXT "subject to the following conditions:", 1011, 10, 130, 206, 8
+ 
+-    LTEXT "The above copyright notice and this permission notice shall be", 1012, 10, 130, 206, 8
+-    LTEXT "included in all copies or substantial portions of the Software.", 1013, 10, 138, 206, 8
++    LTEXT "The above copyright notice and this permission notice shall be", 1012, 10, 146, 206, 8
++    LTEXT "included in all copies or substantial portions of the Software.", 1013, 10, 154, 206, 8
+ 
+-    LTEXT "THE SOFTWARE IS PROVIDED ""AS IS"", WITHOUT", 1014, 10, 154, 206, 8
+-    LTEXT "WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,", 1015, 10, 162, 206, 8
+-    LTEXT "INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF", 1016, 10, 170, 206, 8
+-    LTEXT "MERCHANTABILITY, FITNESS FOR A PARTICULAR", 1017, 10, 178, 206, 8
+-    LTEXT "PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE", 1018, 10, 186, 206, 8
+-    LTEXT "COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES", 1019, 10, 194, 206, 8
+-    LTEXT "OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,", 1020, 10, 202, 206, 8
+-    LTEXT "TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN", 1021, 10, 210, 206, 8
+-    LTEXT "CONNECTION WITH THE SOFTWARE OR THE USE OR", 1022, 10, 218, 206, 8
+-    LTEXT "OTHER DEALINGS IN THE SOFTWARE.", 1023, 10, 226, 206, 8
++    LTEXT "THE SOFTWARE IS PROVIDED ""AS IS"", WITHOUT", 1014, 10, 170, 206, 8
++    LTEXT "WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,", 1015, 10, 178, 206, 8
++    LTEXT "INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF", 1016, 10, 186, 206, 8
++    LTEXT "MERCHANTABILITY, FITNESS FOR A PARTICULAR", 1017, 10, 194, 206, 8
++    LTEXT "PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE", 1018, 10, 202, 206, 8
++    LTEXT "COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES", 1019, 10, 210, 206, 8
++    LTEXT "OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,", 1020, 10, 218, 206, 8
++    LTEXT "TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN", 1021, 10, 226, 206, 8
++    LTEXT "CONNECTION WITH THE SOFTWARE OR THE USE OR", 1022, 10, 234, 206, 8
++    LTEXT "OTHER DEALINGS IN THE SOFTWARE.", 1023, 10, 242, 206, 8
+ 
+ END
+ 
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/wincfg.c
+--- a/windows/wincfg.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/wincfg.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -109,6 +109,12 @@
      ctrl_checkbox(s, "Control-Alt is different from AltGr", 'd',
  		  HELPCTX(keyboard_ctrlalt),
@@ -25591,7 +25395,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincfg.c
  		c->radio.buttondata =
  		    sresize(c->radio.buttondata, c->radio.nbuttons, intorptr);
  		c->radio.buttondata[c->radio.nbuttons-3] = I(VT_XWINDOWS);
-@@ -345,6 +356,68 @@
+@@ -345,6 +356,99 @@
  		  HELPCTX(behaviour_altenter),
  		  dlg_stdcheckbox_handler,
  		  I(offsetof(Config,fullscreenonaltenter)));
@@ -25600,52 +25404,83 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincfg.c
 +		  HELPCTX(no_help),
 +		  dlg_stdcheckbox_handler, I(offsetof(Config,ctrl_tab_switch)));
 +
-+    /*
-+     * HACK: PuttyTray / Reconnect
-+     */
++    /* HACK: PuttyTray / Reconnect */
 +    s = ctrl_getset(b, "Connection", "reconnect", "Reconnect options");
 +    ctrl_checkbox(s, "Attempt to reconnect on system wakeup", 'w', HELPCTX(no_help), dlg_stdcheckbox_handler, I(offsetof(Config,wakeup_reconnect)));
 +    ctrl_checkbox(s, "Attempt to reconnect on connection failure", 'f', HELPCTX(no_help), dlg_stdcheckbox_handler, I(offsetof(Config,failure_reconnect)));
 +
-+	/* > transparent background patch */
-+    /*
-+     * The Window/Wallpaper panel.
-+     */
-+    ctrl_settitle(b, "Window/Wallpaper", "Options controlling wallpaper");
++    /* Background */
++    ctrl_settitle(b, "Window/Background", "Options controlling background");
++    s = ctrl_getset(b, "Window/Background", "background", "Background");
++    ctrl_radiobuttons(s, "Effect:", 'e', 4,
++                      HELPCTX(no_help),
++                      dlg_stdradiobutton_handler,
++                      I(offsetof(Config, bg_effect)),
++                      "Plane", I(0),
++                      "Glass", I(1),
++                      "Double Glass", I(2),
++                      NULL);
++    ctrl_radiobuttons(s, "Wallpaper:", 'x', 2,
++                      HELPCTX(no_help),
++                      dlg_stdradiobutton_handler,
++                      I(offsetof(Config, bg_wallpaper)),
++                      "None", I(0),
++                      "Bitmap file", I(1),
++                      "Bitmap file on Desktop", I(2),
++                      "Desktop", I(3),
++                      NULL);
 +
-+	s = ctrl_getset( b, "Window/Wallpaper", "wallpaper",
-+					 "Transparent background mode" );
-+    ctrl_radiobuttons( s, NULL, NO_SHORTCUT, 1,
-+					   HELPCTX(no_help),
-+					   dlg_stdradiobutton_handler,
-+					   I(offsetof(Config, transparent_mode)),
-+					   "Disable", 'd', I(0),
-+					   "Like transparent xterms", 'x', I(1),
-+					   "Use bitmap file", 'b', I(2),
-+					   "Glass", 'v', I(4),
-+					   NULL );
++    s = ctrl_getset(b, "Window/Background", "wallpaper", "Wallpaper");
++    ctrl_filesel(s, "Bitmap file:", NO_SHORTCUT,
++                 FILTER_IMAGE_FILES,
++                 FALSE, "Select bitmap file for background",
++                 HELPCTX(no_help),
++                 dlg_stdfilesel_handler, I(offsetof(Config,wp_file)) );
++    ctrl_checkbox(s, "Draw while moving/resizing", 'n',
++                  HELPCTX(no_help),
++                  dlg_stdcheckbox_handler,
++                  I(offsetof(Config, wp_moving)));
++    ctrl_radiobuttons(s, "Position:", 'p', 3,
++                      HELPCTX(no_help),
++                      dlg_stdradiobutton_handler,
++                      I(offsetof(Config, wp_position)),
++                      "Fill", I(0),
++                      "Fit", I(1),
++                      "Stretch", I(2),
++                      "Tile", I(3),
++                      "Center", I(4),
++                      NULL);
++    ctrl_radiobuttons(s, "Horizontal Align:", 'h', 3,
++                      HELPCTX(no_help),
++                      dlg_stdradiobutton_handler,
++                      I(offsetof(Config, wp_align)),
++                      "Left", I(0),
++                      "Center", I(1),
++                      "Right", I(2),
++                      NULL);
++    ctrl_radiobuttons(s, "Vertical Align:", 'v', 3,
++                      HELPCTX(no_help),
++                      dlg_stdradiobutton_handler,
++                      I(offsetof(Config, wp_valign)),
++                      "Top", I(0),
++                      "Middle", I(1),
++                      "Bottom", I(2),
++                      NULL);
 +
-+	s = ctrl_getset( b, "Window/Wallpaper", "shading",
-+					 "Adjust transparency" );
-+	ctrl_editbox( s, "Alpha value of bg image (0 - 255) :", 'l', 20,
-+				  HELPCTX(no_help),
-+				  dlg_stdeditbox_handler, I(offsetof(Config,shading)), I(-1) );
-+
-+	s = ctrl_getset( b, "Window/Wallpaper", "imgfile",
-+					 "Use bitmap file mode settings" );
-+	ctrl_checkbox( s, "Use AlphaBlending", 'u',
-+				   HELPCTX(no_help),
-+				   dlg_stdcheckbox_handler, I(offsetof(Config,use_alphablend)) );
-+	ctrl_checkbox( s, "Stopped to draw when moving", 's',
-+				   HELPCTX(no_help),
-+				   dlg_stdcheckbox_handler, I(offsetof(Config,stop_when_moving)) );
-+	ctrl_filesel( s, "Bitmap file used for background :", NO_SHORTCUT,
-+				  FILTER_IMAGE_FILES,
-+				  FALSE, "Select bitmap file for background",
-+				  HELPCTX(no_help),
-+				  dlg_stdfilesel_handler, I(offsetof(Config,bgimg_file)) );
-+
-+	/* < */
++    /* Transparency */
++    ctrl_settitle(b, "Window/Transparency", "Options controlling transparency");
++    s = ctrl_getset(b, "Window/Transparency", "alpha",
++                    "Default Background Alpha Value 0-100");
++    ctrl_editbox(s, "Active Window", NO_SHORTCUT, 20,
++                 HELPCTX(no_help),
++                 dlg_stdeditbox_handler,
++                 I(offsetof(Config, alphas_pc[ALPHA_DEFAULT_BG][BG_ACTIVE])),
++                 I(-1));
++    ctrl_editbox(s, "Inactive Window", NO_SHORTCUT, 20,
++                 HELPCTX(no_help),
++                 dlg_stdeditbox_handler,
++                 I(offsetof(Config, alphas_pc[ALPHA_DEFAULT_BG][BG_INACTIVE])),
++                 I(-1));
 +
 +    /*
 +     * The icon for Windows title bar
@@ -25660,7 +25495,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincfg.c
  
      /*
       * Windows supports a local-command proxy. This also means we
-@@ -362,7 +435,7 @@
+@@ -362,7 +466,7 @@
  		c->radio.buttons =
  		    sresize(c->radio.buttons, c->radio.nbuttons, char *);
  		c->radio.buttons[c->radio.nbuttons-1] =
@@ -25669,7 +25504,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincfg.c
  		c->radio.buttondata =
  		    sresize(c->radio.buttondata, c->radio.nbuttons, intorptr);
  		c->radio.buttondata[c->radio.nbuttons-1] = I(PROXY_CMD);
-@@ -377,7 +450,7 @@
+@@ -377,7 +481,7 @@
  		offsetof(Config, proxy_telnet_command)) {
  		assert(c->generic.handler == dlg_stdeditbox_handler);
  		sfree(c->generic.label);
@@ -25678,9 +25513,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincfg.c
  					  " proxy command");
  		break;
  	    }
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincons2.c
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/wincons2.c
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/wincons2.c	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/wincons2.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,179 @@
 +/*
 + * console.c: various interactive-prompt routines shared between
@@ -25861,9 +25696,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/wincons2.c
 +     */
 +    return;
 +}
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winconsw.c
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winconsw.c
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/winconsw.c	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/winconsw.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,442 @@
 +/*
 + * winconsw.c - various interactive-prompt routines shared between
@@ -26307,9 +26142,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winconsw.c
 +     */
 +    return;
 +}
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winctrls.c
---- a/windows/winctrls.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winctrls.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winctrls.c
+--- a/windows/winctrls.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winctrls.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -27,23 +27,23 @@
  #define GAPXBOX 7
  #define GAPYBOX 4
@@ -26495,9 +26330,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winctrls.c
  }
  
  void dlg_filesel_set(union control *ctrl, void *dlg, Filename fn)
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/windefs.c
---- a/windows/windefs.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/windefs.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/windefs.c
+--- a/windows/windefs.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/windefs.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -10,9 +10,100 @@
  {
      FontSpec ret;
@@ -26601,9 +26436,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/windefs.c
  	ret.height = 10;
      } else {
  	ret.name[0] = '\0';
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/windlg.c
---- a/windows/windlg.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/windlg.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/windlg.c
+--- a/windows/windlg.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/windlg.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -86,6 +86,7 @@
  	for (i = 0; i < nevents; i++)
  	    SendDlgItemMessage(hwnd, IDN_LIST, LB_ADDSTRING,
@@ -26692,39 +26527,19 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/windlg.c
  	ShowWindow(logbox, SW_SHOWNORMAL);
      }
      SetActiveWindow(logbox);
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
---- a/windows/window.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/window.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -28,6 +28,13 @@
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/window.c
+--- a/windows/window.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/window.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -28,6 +28,8 @@
  #include <commctrl.h>
  #include <richedit.h>
  #include <mmsystem.h>
 +#include <dwmapi.h>
 +
-+/* > transparent background patch */
-+#include <wingdi.h>  /* AlphaBlend */
-+/* #include <winbase.h> */  /* OutputDebugString */
-+/* #define XTRANS_AVOID_UL_BUG */
-+/* < */
  
  /* From MSDN: In the WM_SYSCOMMAND message, the four low-order bits of
   * wParam are used by Windows, and should be masked off, so we shouldn't
-@@ -151,6 +158,14 @@
-     int len;
- };
- 
-+static void extend_glass_frame(HWND);
-+
-+/* > transparent background patch */
-+static HBITMAP background_bmp = NULL;
-+static void xtrans_paint_bg(HDC, int, int, int, int);
-+static void (*xtrans_paint_background)(HDC, int, int, int, int) = xtrans_paint_bg;
-+/* < */
-+
- #define FONT_NORMAL 0
- #define FONT_BOLD 1
- #define FONT_UNDERLINE 2
-@@ -177,7 +192,7 @@
+@@ -177,7 +179,7 @@
  } und_mode;
  static int descent;
  
@@ -26733,249 +26548,70 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  #define NEXTCOLOURS 240
  #define NALLCOLOURS (NCFGCOLOURS + NEXTCOLOURS)
  static COLORREF colours[NALLCOLOURS];
-@@ -202,6 +217,241 @@
+@@ -202,6 +204,62 @@
  
  static UINT wm_mousewheel = WM_MOUSEWHEEL;
  
-+static void ExtTextOutW2 (HDC, int, int, UINT, const RECT *, WCHAR *, UINT, const int *, int);
++static void ExtTextOutW2 (int, HDC, int, int, UINT, const RECT *, WCHAR *,
++			  UINT, const int *);
 +
-+/*
-+ * HACK: PuttyTray / Reconnect
-+ */
++static void
++ExtTextOutW2wide (HDC a1, int a2, int a3, UINT a4, const RECT *a5, WCHAR *a6,
++		  UINT a7, const int *a8)
++{
++  ExtTextOutW2 (1, a1, a2, a3, a4, a5, a6, a7, a8);
++}
++
++static void
++ExtTextOutW2narrow (HDC a1, int a2, int a3, UINT a4, const RECT *a5, WCHAR *a6,
++		    UINT a7, const int *a8)
++{
++  ExtTextOutW2 (0, a1, a2, a3, a4, a5, a6, a7, a8);
++}
++
++/* HACK: PuttyTray / Reconnect */
 +static time_t last_reconnect = 0;
 +
-+/* */
++/* Background */
++DECL_WINDOWS_FUNCTION(static, HRESULT, DwmIsCompositionEnabled, (BOOL*));
++DECL_WINDOWS_FUNCTION(static, HRESULT, DwmExtendFrameIntoClientArea, (HWND, MARGINS*));
++DECL_WINDOWS_FUNCTION(static, HRESULT, DwmEnableBlurBehindWindow, (HWND, DWM_BLURBEHIND*));
++DECL_WINDOWS_FUNCTION(static, HRESULT, BufferedPaintSetAlpha, (HPAINTBUFFER, const RECT *, BYTE));
++DECL_WINDOWS_FUNCTION(static, HPAINTBUFFER, BeginBufferedPaint, (HDC, const RECT *, BP_BUFFERFORMAT, BP_PAINTPARAMS *, HDC *));
++DECL_WINDOWS_FUNCTION(static, HRESULT, EndBufferedPaint, (HPAINTBUFFER, BOOL));
 +
++static void bg_init();
++static void bg_create();
++static void bg_resize(int draw);
++static void bg_move(int draw);
++static void bg_order();
++static void bg_glass();
++static void bg_trans();
++static LRESULT CALLBACK bg_WndProc(HWND bg_hwnd, UINT message, WPARAM wParam, LPARAM lParam);
++static void bm_create();
++static void wp_create();
++static void wp_draw(HDC hdc, RECT *rc);
++
++static HWND bg_hwnd = NULL;
++static HBRUSH bg_br = NULL;
++static INT bg_active = BG_ACTIVE;
++static HDC bm_dc = NULL;
++static int bm_width;
++static int bm_height;
++static HDC wp_dc = NULL;
++
++/* transparency */
++static BYTE alphas[4][2];
++
++/* IME */
 +static int ime_mode = 0;
 +static wchar_t ime_w[1024];
 +static char ime_m[512];
 +
-+/* > transparent background patch */
-+void xtrans_paint_bg(HDC hdc, int x, int y, int width, int height)
-+{
-+    HDC memhdc;
-+    HBITMAP defbmp;
-+
-+    memhdc = CreateCompatibleDC(hdc);
-+    defbmp = SelectObject(memhdc, background_bmp);
-+
-+    BitBlt(hdc, x, y, width, height, memhdc, x, y, SRCCOPY);
-+
-+    SelectObject(memhdc, defbmp);
-+    DeleteDC(memhdc);
-+}
-+
-+void xtrans_paint_bg_fwp(HDC hdc, int x, int y, int width, int height)
-+{
-+    HDC memhdc;
-+    HBITMAP defbmp;
-+    POINT point;
-+
-+    point.x = x;
-+    point.y = y;
-+    ClientToScreen(hwnd, &point);
-+
-+    memhdc = CreateCompatibleDC(hdc);
-+    defbmp = SelectObject(memhdc, background_bmp);
-+
-+    BitBlt(hdc, x, y, width, height, memhdc, point.x, point.y, SRCCOPY);
-+
-+    SelectObject(memhdc, defbmp);
-+    DeleteDC(memhdc);
-+}
-+
-+void xtrans_free_background()
-+{
-+    if (background_bmp) {
-+        DeleteObject(background_bmp);
-+        background_bmp = NULL;
-+    }
-+}
-+
-+void xtrans_daub_with_bgcolor(HDC hdc, int width, int height)
-+{
-+    HPEN pen, defpen;
-+    HBRUSH brush, defbrush;
-+
-+    pen = CreatePen(PS_SOLID, 0, colours[258]);
-+    defpen = SelectObject(hdc, pen);
-+    brush = CreateSolidBrush(colours[258]);
-+    defbrush = SelectObject(hdc, brush);
-+
-+    Rectangle(hdc, 0, 0, width, height);
-+
-+    SelectObject(hdc, defpen);
-+    DeleteObject(pen);
-+    SelectObject(hdc, defbrush);
-+    DeleteObject(brush);
-+}
-+
-+void xtrans_set_background()
-+{
-+    HDC hdc, memhdc;
-+    HBITMAP defbmp;
-+
-+    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 0, 0 };
-+
-+    RECT rect, up_rect;
-+    int width, height;
-+
-+    if (cfg.transparent_mode == -1) {
-+        cfg.transparent_mode = 1;
-+        if (background_bmp)
-+            xtrans_free_background();
-+    }
-+
-+    bf.SourceConstantAlpha = (BYTE) cfg.shading;
-+
-+    GetClientRect(hwnd, &rect);
-+
-+    InvalidateRect(hwnd, NULL, FALSE);
-+    GetUpdateRect(hwnd, &up_rect, FALSE);
-+    width = up_rect.right - up_rect.left;
-+    height = up_rect.bottom - up_rect.top;
-+
-+    hdc = GetDC(hwnd);
-+    memhdc = CreateCompatibleDC(hdc);
-+
-+    if (background_bmp == NULL)
-+        background_bmp = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-+
-+    defbmp = SelectObject(memhdc, background_bmp);
-+
-+    xtrans_daub_with_bgcolor(memhdc, rect.right, rect.bottom);
-+    PaintDesktop(hdc);
-+    AlphaBlend(memhdc, up_rect.left, up_rect.top, width, height,
-+               hdc, up_rect.left, up_rect.top, width, height, bf);
-+
-+    SelectObject(memhdc, defbmp);
-+    DeleteDC(memhdc);
-+    ReleaseDC(hwnd, hdc);
-+}
-+
-+void xtrans_set_bitmap()
-+{
-+    if (cfg.bgimg_file.path[0] != '\0') {
-+        if (background_bmp)
-+            xtrans_free_background();
-+        background_bmp = LoadImage(0, cfg.bgimg_file.path,
-+                                   IMAGE_BITMAP, 0, 0,
-+                                   LR_LOADFROMFILE | LR_DEFAULTSIZE);
-+    }
-+
-+    if (background_bmp == NULL) {
-+        cfg.transparent_mode = 0;
-+        return;
-+    }
-+
-+    if (cfg.use_alphablend) {
-+        HDC hdc, memhdc, memhdc_mask;
-+        HBITMAP bmp_mask, defbmp_mask, defbmp;
-+        BLENDFUNCTION bf = { AC_SRC_OVER, 0, 0, 0 };
-+        int width, height;
-+
-+        bf.SourceConstantAlpha = (BYTE) cfg.shading;
-+
-+        hdc = GetDC(hwnd);
-+        memhdc = CreateCompatibleDC(hdc);
-+        memhdc_mask = CreateCompatibleDC(hdc);
-+        defbmp = SelectObject(memhdc, background_bmp);
-+        width = GetDeviceCaps(memhdc, HORZRES);
-+        height = GetDeviceCaps(memhdc, VERTRES);
-+        bmp_mask = CreateCompatibleBitmap(hdc, width, height);
-+        ReleaseDC(hwnd, hdc);
-+        defbmp_mask = SelectObject(memhdc_mask, bmp_mask);
-+
-+        xtrans_daub_with_bgcolor(memhdc_mask, width, height);
-+        AlphaBlend(memhdc_mask, 0, 0, width, height,
-+                   memhdc, 0, 0, width, height, bf);
-+
-+        SelectObject(memhdc_mask, defbmp_mask);
-+        DeleteDC(memhdc_mask);
-+        SelectObject(memhdc, defbmp);
-+        DeleteDC(memhdc);
-+
-+        DeleteObject(background_bmp);
-+        background_bmp = bmp_mask;
-+    }
-+}
-+
-+
-+void xtrans_load_bitmap()
-+{
-+    HANDLE find_handle;
-+    WIN32_FIND_DATA find_data;
-+
-+    char pass[MAX_PATH], shading[4];
-+    char *cp;
-+    int i;
-+
-+    if (cfg.transparent_mode == 2 && cfg.bgimg_file.path[0] != '\0')
-+        return;
-+
-+    GetModuleFileName(NULL, pass, MAX_PATH);
-+    cp = strrchr(pass, '\\');
-+    if (cp == NULL)
-+        return;
-+    strcpy(++cp, "putty*.bmp");
-+
-+    find_handle = FindFirstFile(pass, &find_data);
-+    if (find_handle == INVALID_HANDLE_VALUE)
-+        return;
-+    FindClose(find_handle);
-+    strcpy(cp, find_data.cFileName);
-+
-+    /*
-+     * putty76.bmp
-+     *      ^^ shading value (0 - 255)
-+     */
-+    if (background_bmp)
-+        xtrans_free_background();
-+    background_bmp = LoadImage(0, pass, IMAGE_BITMAP, 0, 0,
-+                               LR_LOADFROMFILE | LR_DEFAULTSIZE);
-+    cfg.transparent_mode = 2;
-+
-+    cp += 5;
-+    for (i = 0; i < 3 && isdigit(*cp); i++, cp++)
-+        shading[i] = *cp;
-+    shading[i+1] = '\0';
-+
-+    if (i > 0) {
-+        cfg.use_alphablend = 1;
-+        cfg.shading = atoi(shading);
-+    }
-+}
-+
-+
-+void xtrans_init(int reinit)
-+{
-+    if (reinit)
-+        xtrans_load_bitmap();
-+
-+    if (cfg.shading < 0 || 255 < cfg.shading) {
-+        if (cfg.transparent_mode == 1)
-+            cfg.transparent_mode = 0;
-+        cfg.shading = 0;
-+    }
-+
-+    if ((cfg.transparent_mode & 3) == 0 && background_bmp)
-+        xtrans_free_background();
-+
-+    if (cfg.transparent_mode == 1) {
-+        xtrans_set_background();
-+        xtrans_paint_background = xtrans_paint_bg;
-+    }
-+    else if (cfg.transparent_mode == 2) {
-+        xtrans_set_bitmap();
-+        xtrans_paint_background = xtrans_paint_bg_fwp;
-+    }
-+}
-+/* < */
-+
  /* Dummy routine, only required in plink. */
  void ldisc_update(void *frontend, int echo, int edit)
  {
-@@ -322,6 +572,9 @@
+@@ -322,6 +380,9 @@
      must_close_session = FALSE;
  }
  
@@ -26985,7 +26621,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
  {
      WNDCLASS wndclass;
-@@ -386,6 +639,8 @@
+@@ -386,6 +447,8 @@
  	 * a session. This gets set to TRUE if something happens to change
  	 * that (e.g., a hostname is specified on the command-line). */
  	int allow_launch = FALSE;
@@ -26994,7 +26630,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  
  	default_protocol = be_default_protocol;
  	/* Find the appropriate default port. */
-@@ -397,6 +652,30 @@
+@@ -397,6 +460,30 @@
  	}
  	cfg.logtype = LGTYP_NONE;
  
@@ -27025,7 +26661,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	do_defaults(NULL, &cfg);
  
  	p = cmdline;
-@@ -451,11 +730,7 @@
+@@ -451,11 +538,7 @@
  	     * Otherwise, break up the command line and deal with
  	     * it sensibly.
  	     */
@@ -27038,7 +26674,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	    for (i = 0; i < argc; i++) {
  		char *p = argv[i];
  		int ret;
-@@ -635,7 +910,23 @@
+@@ -635,7 +718,23 @@
  	wndclass.lpfnWndProc = WndProc;
  	wndclass.cbClsExtra = 0;
  	wndclass.cbWndExtra = 0;
@@ -27062,7 +26698,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	wndclass.hIcon = LoadIcon(inst, MAKEINTRESOURCE(IDI_MAINICON));
  	wndclass.hCursor = LoadCursor(NULL, IDC_IBEAM);
  	wndclass.hbrBackground = NULL;
-@@ -683,7 +974,7 @@
+@@ -683,7 +782,7 @@
  	if (cfg.sunken_edge)
  	    exwinmode |= WS_EX_CLIENTEDGE;
  	hwnd = CreateWindowEx(exwinmode, appname, appname,
@@ -27071,44 +26707,18 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  			      guess_width, guess_height,
  			      NULL, NULL, inst, NULL);
      }
-@@ -699,6 +990,14 @@
-     term_provide_logctx(term, logctx);
-     term_size(term, cfg.height, cfg.width, cfg.savelines);
- 
-+	/* > transparent background patch */
-+    /* Avoid Unicode line drawing bug. */
-+#ifdef XTRANS_AVOID_UL_BUG
-+    if (cfg.vtmode == VT_UNICODE && (cfg.transparent_mode & 3))
-+        cfg.vtmode = VT_POORMAN;
-+#endif
-+	/* < */
-+
-     /*
-      * Initialise the fonts, simultaneously correcting the guesses
-      * for font_{width,height}.
-@@ -817,6 +1116,10 @@
-     ShowWindow(hwnd, show);
-     SetForegroundWindow(hwnd);
- 
-+    /* > transparent background patch */
-+    xtrans_load_bitmap();
-+    /* < */
-+
-     /*
-      * Set the palette up.
-      */
-@@ -824,6 +1127,10 @@
+@@ -824,6 +923,10 @@
      logpal = NULL;
      init_palette();
  
-+    /* > transparent background patch */
-+    xtrans_init(0);
-+    /* < */
++    /* Background */
++    bg_init();
++    bg_create();
 +
      term_set_focus(term, GetForegroundWindow() == hwnd);
      UpdateWindow(hwnd);
  
-@@ -845,6 +1152,9 @@
+@@ -845,6 +948,9 @@
  	    sfree(handles);
  
  	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -27118,18 +26728,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	    if (msg.message == WM_QUIT)
  		goto finished;	       /* two-level break */
  
-@@ -899,6 +1209,10 @@
-     /* Clean up COM. */
-     CoUninitialize();
- 
-+	/* > transparent background patch */
-+    xtrans_free_background();
-+	/* < */
-+
-     exit(code);
- }
- 
-@@ -1079,17 +1393,34 @@
+@@ -1079,17 +1185,34 @@
      va_list ap;
      char *stuff, morestuff[100];
  
@@ -27173,7 +26772,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
      }
  }
  
-@@ -1138,10 +1469,11 @@
+@@ -1138,10 +1261,11 @@
      static const int ww[] = {
  	256, 257, 258, 259, 260, 261,
  	0, 8, 1, 9, 2, 10, 3, 11,
@@ -27187,7 +26786,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	int w = ww[i];
  	defpal[w].rgbtRed = cfg.colours[i][0];
  	defpal[w].rgbtGreen = cfg.colours[i][1];
-@@ -1181,6 +1513,8 @@
+@@ -1181,6 +1305,8 @@
  	{ COLOR_WINDOW,		258, 259 }, /* Default Background */
  	{ COLOR_HIGHLIGHTTEXT,	260, 260 }, /* Cursor Text */
  	{ COLOR_HIGHLIGHT,	261, 261 }, /* Cursor Colour */
@@ -27196,82 +26795,69 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
      };
  
      for (i = 0; i < (sizeof(or)/sizeof(or[0])); i++) {
-@@ -1364,6 +1698,58 @@
-     return ret;
- }
+@@ -1288,7 +1414,10 @@
+  */
+ static void general_textout(HDC hdc, int x, int y, CONST RECT *lprc,
+ 			    unsigned short *lpString, UINT cbCount,
+-			    CONST INT *lpDx, int opaque)
++			    CONST INT *lpDx, int opaque,
++			    void (*ExtTextOutW) (HDC, int, int, UINT,
++						 const RECT *, WCHAR *, UINT,
++						 const int *))
+ {
+     int i, j, xp, xn;
+     int bkmode = 0, got_bkmode = FALSE;
+@@ -1663,6 +1792,9 @@
+ 	SetWindowPos(hwnd, NULL, 0, 0, width, height,
+ 	    SWP_NOACTIVATE | SWP_NOCOPYBITS |
+ 	    SWP_NOMOVE | SWP_NOZORDER);
++
++        /* Background */
++	bg_resize(1);
+     } else
+ 	reset_window(0);
  
-+static void general_textout2(HDC hdc, int x, int y, CONST RECT *lprc,
-+			    unsigned short *lpString, UINT cbCount,
-+			    CONST INT *lpDx, int opaque, int wide, int iso2022)
-+{
-+    int i, j, xp, xn;
-+    int bkmode = 0, got_bkmode = FALSE;
+@@ -1755,6 +1887,10 @@
+ #endif
+ 	    }
+ 	}
 +
-+    xp = xn = x;
++	/* Background */
++	bg_resize(1);
 +
-+    for (i = 0; i < (int)cbCount ;) {
-+	int rtl = is_rtl(lpString[i]);
-+
-+	xn += lpDx[i];
-+
-+	for (j = i+1; j < (int)cbCount; j++) {
-+	    if (rtl != is_rtl(lpString[j]))
-+		break;
-+	    xn += lpDx[j];
-+	}
-+
-+	/*
-+	 * Now [i,j) indicates a maximal substring of lpString
-+	 * which should be displayed using the same textout
-+	 * function.
-+	 */
-+	if (rtl) {
-+	    exact_textout(hdc, xp, y, lprc, lpString+i, j-i,
-+                          font_varpitch ? NULL : lpDx+i, opaque);
-+	} else {
-+	  if(!iso2022)
-+	    ExtTextOutW(hdc, xp, y, ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
-+			lprc, lpString+i, j-i,
-+                        font_varpitch ? NULL : lpDx+i);
-+	  else
-+	    ExtTextOutW2(hdc, xp, y, ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
-+			lprc, lpString+i, j-i,
-+                         font_varpitch ? NULL : lpDx+i, wide);
-+	}
-+
-+	i = j;
-+	xp = xn;
-+
-+        bkmode = GetBkMode(hdc);
-+        got_bkmode = TRUE;
-+        SetBkMode(hdc, TRANSPARENT);
-+        opaque = FALSE;
-+    }
-+
-+    if (got_bkmode)
-+        SetBkMode(hdc, bkmode);
-+}
-+
- /*
-  * Initialise all the fonts we will need initially. There may be as many as
-  * three or as few as one.  The other (potentially) twenty-one fonts are done
-@@ -1691,6 +2077,15 @@
-     win_width  = cr.right - cr.left;
-     win_height = cr.bottom - cr.top;
+ 	return;
+     }
  
-+	/* > transparent background patch */
-+    if (cfg.transparent_mode == 2) {
-+        if (cfg.stop_when_moving)
-+            InvalidateRect(hwnd, NULL, FALSE);
-+    }
-+    else if (cfg.transparent_mode & 3)
-+        xtrans_set_background();
-+	/* < */
-+
-     if (cfg.resize_action == RESIZE_DISABLED) reinit = 2;
+@@ -1783,6 +1919,9 @@
+ 			 SWP_NOMOVE | SWP_NOZORDER);
+ 	}
  
-     /* Are we being forced to reload the fonts ? */
-@@ -1950,6 +2345,43 @@
++	/* Background */
++	bg_resize(1);
++
+ 	InvalidateRect(hwnd, NULL, TRUE);
+ 	return;
+     }
+@@ -1841,6 +1980,9 @@
+ 			 font_height*term->rows + extra_height,
+ 			 SWP_NOMOVE | SWP_NOZORDER);
+ 
++	    /* Background */
++	    bg_resize(1);
++
+ 	    InvalidateRect(hwnd, NULL, TRUE);
+ #ifdef RDB_DEBUG_PATCH
+ 	    debug((27, "reset_window() -> window resize to (%d,%d)",
+@@ -1864,6 +2006,8 @@
+ 
+ 	extra_width = wr.right - wr.left - cr.right + cr.left +offset_width*2;
+ 	extra_height = wr.bottom - wr.top - cr.bottom + cr.top+offset_height*2;
++	/* Background */
++	bg_resize(1);
+ 
+ 	InvalidateRect(hwnd, NULL, TRUE);
+ #ifdef RDB_DEBUG_PATCH
+@@ -1950,6 +2094,43 @@
      return FALSE;
  }
  
@@ -27315,18 +26901,14 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  static int resizing;
  
  void notify_remote_exit(void *fe)
-@@ -2007,7 +2439,21 @@
+@@ -2007,7 +2188,17 @@
  	    }
  	}
  	return 0;
 +      case WM_DWMCOMPOSITIONCHANGED:
-+	if (cfg.transparent_mode == 4) {
-+            extend_glass_frame(hwnd);
-+	}
++	bg_glass();
++	break;
        case WM_CREATE:
-+	if (cfg.transparent_mode == 4) {
-+            extend_glass_frame(hwnd);
-+	}
 +        if (cfg.ctrl_tab_switch) {
 +	    int wndExtra = GetClassLong(hwnd, GCL_CBWNDEXTRA);
 +	    FILETIME filetime;
@@ -27337,23 +26919,18 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	break;
        case WM_CLOSE:
  	{
-@@ -2174,6 +2620,15 @@
- 		cfgtopalette();
- 		init_palette();
+@@ -2272,6 +2463,10 @@
+ 		    (cfg.resize_action != prev_cfg.resize_action))
+ 		    init_lvl = 2;
  
-+        /* > transparent background patch */
-+		xtrans_init(1);
-+        /* Avoid Unicode line drawing bug. */
-+#ifdef XTRANS_AVOID_UL_BUG
-+        if (cfg.vtmode == VT_UNICODE && (cfg.transparent_mode & 3))
-+            cfg.vtmode = VT_POORMAN;
-+#endif
-+        /* < */
++		/* Background */
++		bg_init();
++		bg_create();
 +
- 		/* Pass new config data to the terminal */
- 		term_reconfig(term, &cfg);
- 
-@@ -2480,6 +2935,20 @@
+ 		InvalidateRect(hwnd, NULL, TRUE);
+ 		reset_window(init_lvl);
+ 		net_pending_errors();
+@@ -2480,6 +2675,20 @@
  	 */
  	noise_ultralight(lParam);
  
@@ -27374,21 +26951,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	if (wParam & (MK_LBUTTON | MK_MBUTTON | MK_RBUTTON) &&
  	    GetCapture() == hwnd) {
  	    Mouse_Button b;
-@@ -2597,6 +3066,13 @@
- 			offset_width+font_width*term->cols,
- 			offset_height+font_height*term->rows);
- 
-+		/* > transparent background patch */
-+		if ((cfg.transparent_mode & 3) > 0)
-+            (*xtrans_paint_background)(hdc, p.rcPaint.left, p.rcPaint.top,
-+                                       p.rcPaint.right - p.rcPaint.left,
-+                                       p.rcPaint.bottom - p.rcPaint.top);
-+		else
-+		/* < */
- 		Rectangle(hdc, p.rcPaint.left, p.rcPaint.top, 
- 			  p.rcPaint.right, p.rcPaint.bottom);
- 
-@@ -2626,9 +3102,25 @@
+@@ -2626,9 +2835,25 @@
  	pend_netevent_lParam = lParam;
  	if (WSAGETSELECTEVENT(lParam) != FD_READ)
  	    enact_pending_netevent();
@@ -27414,22 +26977,69 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
        case WM_SETFOCUS:
  	term_set_focus(term, TRUE);
  	CreateCaret(hwnd, caretbm, font_width, font_height);
-@@ -2658,6 +3150,14 @@
+@@ -2636,6 +2861,11 @@
+ 	flash_window(0);	       /* stop */
+ 	compose_state = 0;
+ 	term_update(term);
++
++	/* Background */
++	bg_order();
++	bg_active = BG_ACTIVE;
++	bg_trans();
+ 	break;
+       case WM_KILLFOCUS:
+ 	show_mouseptr(1);
+@@ -2643,6 +2873,11 @@
+ 	DestroyCaret();
+ 	caret_x = caret_y = -1;	       /* ensure caret is replaced next time */
+ 	term_update(term);
++
++	/* Background */
++	bg_order();
++	bg_active = BG_INACTIVE;
++	bg_trans();
+ 	break;
+       case WM_ENTERSIZEMOVE:
  #ifdef RDB_DEBUG_PATCH
- 	debug((27, "WM_EXITSIZEMOVE"));
+@@ -2660,8 +2895,16 @@
  #endif
-+	/* > transparent background patch */
-+	if (cfg.transparent_mode == 2) {
-+        if (cfg.stop_when_moving)
-+            InvalidateRect(hwnd, NULL, FALSE);
-+    }
-+    else if (cfg.transparent_mode & 3)
-+        xtrans_set_background();
-+	/* < */
  	if (need_backend_resize) {
  	    term_size(term, cfg.height, cfg.width, cfg.savelines);
++
++	    /* Background */
++	    bg_resize(1);
++
  	    InvalidateRect(hwnd, NULL, TRUE);
-@@ -2759,6 +3259,16 @@
+ 	}
++	/* Background */
++	else {
++	    bg_move(1);
++	}
+ 	break;
+       case WM_SIZING:
+ 	/*
+@@ -2719,6 +2962,10 @@
+ 		else
+ 		    r->bottom -= eh;
+ 	    }
++
++	    /* Background */
++	    bg_resize(0);
++
+ 	    if (ew || eh)
+ 		return 1;
+ 	    else
+@@ -2752,6 +2999,9 @@
+ 	    else
+ 		r->bottom = r->top + h*term->rows + ex_height;
+ 
++	    /* Background */
++	    bg_resize(0);
++
+ 	    return rv;
+ 	}
+ 	/* break;  (never reached) */
+@@ -2759,7 +3009,17 @@
  	fullscr_on_max = TRUE;
  	break;
        case WM_MOVE:
@@ -27439,27 +27049,15 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +	    cfg.x = rc.left;
 +	    cfg.y = rc.top;
 +	}
-+	/* > transparent background patch */
-+	if (cfg.transparent_mode == 2 && (! cfg.stop_when_moving))
-+        InvalidateRect(hwnd, NULL, FALSE);
-+	/* < */
  	sys_cursor_update();
++
++	/* Background */
++	bg_move(0);
++
  	break;
        case WM_SIZE:
-@@ -2771,6 +3281,12 @@
- 		"...",
- 	    LOWORD(lParam), HIWORD(lParam)));
- #endif
-+	/* > transparent background patch */
-+	if(cfg.transparent_mode == 1)
-+        cfg.transparent_mode = -1;
-+	else if (cfg.transparent_mode == 2)
-+        InvalidateRect(hwnd, NULL, FALSE);
-+	/* < */
- 	if (wParam == SIZE_MINIMIZED)
- 	    SetWindowText(hwnd,
- 			  cfg.win_name_always ? window_name : icon_name);
-@@ -2864,6 +3380,7 @@
+ #ifdef RDB_DEBUG_PATCH
+@@ -2864,9 +3124,14 @@
  		    cfg.width = w;
                  } else {
                      term_size(term, h, w, cfg.savelines);
@@ -27467,7 +27065,14 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
                  }
              } else {
                  reset_window(0);
-@@ -2920,8 +3437,21 @@
++
++		/* Background */
++		//need_backend_resize = TRUE;
++		bg_resize(0);
+ 	    }
+ 	}
+ 	sys_cursor_update();
+@@ -2920,8 +3185,21 @@
  	return FALSE;
        case WM_KEYDOWN:
        case WM_SYSKEYDOWN:
@@ -27489,7 +27094,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	/*
  	 * Add the scan code and keypress timing to the random
  	 * number noise.
-@@ -2940,10 +3470,10 @@
+@@ -2940,10 +3218,10 @@
  	    int len;
  
  	    if (wParam == VK_PROCESSKEY) { /* IME PROCESS key */
@@ -27502,7 +27107,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  		    m.wParam = wParam;
  		    m.lParam = lParam & 0xdfff;
  		    TranslateMessage(&m);
-@@ -2984,6 +3514,20 @@
+@@ -2984,6 +3262,20 @@
  	/* lParam == Locale */
  	set_input_locale((HKL)lParam);
  	sys_cursor_update();
@@ -27523,13 +27128,33 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	break;
        case WM_IME_STARTCOMPOSITION:
  	{
-@@ -3080,6 +3624,82 @@
+@@ -3018,10 +3310,20 @@
+ 		 * instead we luni_send the characters one by one.
+ 		 */
+ 		term_seen_key_event(term);
++		if (ldisc) {
+ 		for (i = 0; i < n; i += 2) {
+-		    if (ldisc)
++			WCHAR hs = *(unsigned short *)(buff+i);
++			if (IS_HIGH_SURROGATE(hs) && i+2 < n) {
++			    WCHAR ls = *(unsigned short *)(buff+i+2);
++			    if (IS_LOW_SURROGATE(ls)) {
++				luni_send(ldisc, (unsigned short *)(buff+i), 2, 1);
++				i += 2;
++				continue;
++			    }
++			}
+ 			luni_send(ldisc, (unsigned short *)(buff+i), 1, 1);
+ 		}
++		}
+ 		free(buff);
+ 	    }
+ 	    ImmReleaseContext(hwnd, hIMC);
+@@ -3080,6 +3382,80 @@
  	if (process_clipdata((HGLOBAL)lParam, wParam))
  	    term_do_paste(term);
  	return 0;
-+  /*
-+   * HACK: PuttyTray / Reconnect
-+   */
++      /* HACK: PuttyTray / Reconnect */
 +      case WM_POWERBROADCAST:
 +	if(cfg.wakeup_reconnect) {
 +	  switch(wParam) {
@@ -27606,7 +27231,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
        default:
  	if (message == wm_mousewheel || message == WM_MOUSEWHEEL) {
  	    int shift_pressed=0, control_pressed=0;
-@@ -3208,7 +3828,7 @@
+@@ -3208,7 +3584,7 @@
   * We are allowed to fiddle with the contents of `text'.
   */
  void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
@@ -27615,10 +27240,12 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  {
      COLORREF fg, bg, t;
      int nfg, nbg, nfont;
-@@ -3223,6 +3843,28 @@
+@@ -3222,6 +3598,29 @@
+     static int *lpDx = NULL;
      static int lpDx_len = 0;
      int *lpDx_maybe;
- 
++    int len2; /* yoshidam */
++
 +    /* Hyperlink */
 +    {
 +	POINT pt;
@@ -27640,11 +27267,10 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +	  attr |= ATTR_UNDER;
 +	}
 +    }
-+
+ 
      lattr &= LATTR_MODE;
  
-     char_width = fnt_width = font_width * (1 + (lattr != LATTR_NORM));
-@@ -3245,7 +3887,10 @@
+@@ -3245,7 +3644,10 @@
  	    attr &= ~ATTR_BOLD;
  
  	/* cursor fg and bg */
@@ -27656,91 +27282,148 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
      }
  
      nfont = 0;
-@@ -3337,10 +3982,20 @@
-     SelectObject(hdc, fonts[nfont]);
-     SetTextColor(hdc, fg);
-     SetBkColor(hdc, bg);
-+	/* > transparent background patch */
-+	if ((cfg.transparent_mode & 3) && (nbg == 258)) {
-+        SetBkMode(hdc, TRANSPARENT);
-+        (*xtrans_paint_background)(hdc, x, y, char_width * len, font_height);
-+	}
-+    else {
-+	/* < */
-     if (attr & TATTR_COMBINING)
- 	SetBkMode(hdc, TRANSPARENT);
-     else
- 	SetBkMode(hdc, OPAQUE);
-+	/* > transparent background patch */
-+    }
-+	/* < */
-     line_box.left = x;
-     line_box.top = y;
+@@ -3292,7 +3694,8 @@
+     }
+ 
+     /* Anything left as an original character set is unprintable. */
+-    if (DIRECT_CHAR(text[0])) {
++    if (DIRECT_CHAR(text[0]) &&
++	    (len < 2 || !(IS_HIGH_SURROGATE(text[0]) && IS_LOW_SURROGATE(text[1])))) { /* yoshidam */
+ 	int i;
+ 	for (i = 0; i < len; i++)
+ 	    text[i] = 0xFFFD;
+@@ -3346,6 +3749,32 @@
      line_box.right = x + char_width * len;
-@@ -3373,7 +4028,12 @@
+     line_box.bottom = y + font_height;
+ 
++    /* yoshidam: adjust clipping box */
++    {
++	int i;
++	int rc_width = 0;
++	for (i = 0; i < len ; i++) {
++	    if (text[i] == 0xDB40 &&
++		     i+1 < len &&
++                     (text[i+1] >= 0xDD00 && text[i+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
++		i++;
++	    }
++	    else if (IS_HIGH_SURROGATE(text[i]) &&
++	       i+1 < len &&
++               IS_LOW_SURROGATE(text[i+1])) {
++		rc_width += char_width;
++		i++;
++	    }
++	    else if ((text[i] >= 0x180B && text[i] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
++		     (text[i] >= 0xFE00 && text[i] <= 0xFE0F))    /* VARIATION SELECTOR 1-16 */
++		;
++	    else
++		rc_width += char_width;
++	}
++	if (rc_width < line_box.right - line_box.left)
++	    line_box.right = line_box.left + rc_width;
++    }
++
+     /* Only want the left half of double width lines */
+     if (line_box.right > font_width*term->cols+offset_width)
+ 	line_box.right = font_width*term->cols+offset_width;
+@@ -3373,10 +3802,24 @@
          maxlen = len;
      }
  
-+    /* > transparent background patch */
-+    if (cfg.transparent_mode & 3)
-+    opaque = FALSE;
-+    else
-     opaque = TRUE;                     /* start by erasing the rectangle */
-+    /* < */
+-    opaque = TRUE;                     /* start by erasing the rectangle */
      for (remaining = len; remaining > 0;
-          text += len, remaining -= len, x += char_width * len) {
+-         text += len, remaining -= len, x += char_width * len) {
++        text += len, remaining -= len, x += char_width * len2) {
          len = (maxlen < remaining ? maxlen : remaining);
-@@ -3427,17 +4087,19 @@
++        len2 = len;
++      if (maxlen == 1) {
++          if (remaining >= 1 &&
++              IS_HIGH_SURROGATE(text[0]) &&
++              IS_LOW_SURROGATE(text[1]))
++              len++;
++          if (remaining-len >= 1 &&
++              ((text[len] >= 0x180B && text[len] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
++               (text[len] >= 0xFE00 && text[len] <= 0xFE0F)))    /* VARIATION SELECTOR 1-16 */
++              len++;
++          else if (remaining-len >= 2 &&
++                   text[len] == 0xDB40 &&
++                   (text[len+1] >= 0xDD00 && text[len+1] <= 0xDDEF)) /* VARIATION SELECTOR 17-256 */
++              len += 2;
++      }
+ 
+         if (len > lpDx_len) {
+             if (len > lpDx_len) {
+@@ -3386,8 +3829,30 @@
+         }
+         {
+             int i;
+-            for (i = 0; i < len; i++)
++            /* yoshidam: HIGH SURROGATE and VARIATION SELECTOR char has no width */
++            for (i = 0; i < len; i++) {
+                 lpDx[i] = char_width;
++	        if (text[i] == 0xDB40 &&
++		         i+1 < len &&
++                         (text[i+1] >= 0xDD00 && text[i+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
++		    if (i > 0) lpDx[i-1] = 0;
++		    lpDx[i] = 0;
++		    i++;
++                lpDx[i] = char_width;
++        }
++                else if (IS_HIGH_SURROGATE(text[i]) &&
++                    i+1 < len &&
++                    IS_LOW_SURROGATE(text[i+1])) {
++                    lpDx[i] = 0;
++                    i++;
++                    lpDx[i] = char_width;
++                }
++	        else if ((text[i] >= 0x180B && text[i] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
++                         (text[i] >= 0xFE00 && text[i] <= 0xFE0F)) {  /* VARIATION SELECTOR 1-16 */
++		    if (i > 0) lpDx[i-1] = 0;
++		    lpDx[i] = char_width;
++                }
++            }
+         }
+ 
+         /* We're using a private area for direct to font. (512 chars.) */
+@@ -3427,17 +3892,17 @@
              if (nlen <= 0)
                  return;		       /* Eeek! */
  
 -            ExtTextOutW(hdc, x + xoffset,
-+            ExtTextOutW2(hdc, x + xoffset,
++            ExtTextOutW2(!!(attr & ATTR_WIDE), hdc, x + xoffset,
                          y - font_height * (lattr == LATTR_BOT) + text_adjust,
                          ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
                          &line_box, uni_buf, nlen,
 -                        lpDx_maybe);
-+                        lpDx_maybe,
-+                        !!(attr & ATTR_WIDE));
++                         lpDx_maybe);
              if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                  SetBkMode(hdc, TRANSPARENT);
 -                ExtTextOutW(hdc, x + xoffset - 1,
-+                ExtTextOutW2(hdc, x + xoffset - 1,
++                ExtTextOutW2(!!(attr & ATTR_WIDE), hdc, x + xoffset - 1,
                              y - font_height * (lattr ==
                                                 LATTR_BOT) + text_adjust,
 -                            ETO_CLIPPED, &line_box, uni_buf, nlen, lpDx_maybe);
-+                            ETO_CLIPPED, &line_box, uni_buf, nlen, lpDx_maybe,
-+                            !!(attr & ATTR_WIDE));
++                             ETO_CLIPPED, &line_box, uni_buf, nlen, lpDx_maybe);
              }
  
              lpDx[0] = -1;
-@@ -3490,18 +4152,21 @@
-                 wbuf[i] = text[i];
- 
-             /* print Glyphs as they are, without Windows' Shaping*/
--            general_textout(hdc, x + xoffset,
-+            general_textout2(hdc, x + xoffset,
+@@ -3493,12 +3958,14 @@
+             general_textout(hdc, x + xoffset,
                              y - font_height * (lattr==LATTR_BOT) + text_adjust,
                              &line_box, wbuf, len, lpDx,
 -                            opaque && !(attr & TATTR_COMBINING));
-+                             opaque && !(attr & TATTR_COMBINING),
-+                            !!(attr & ATTR_WIDE),
-+                            in_utf (term) && term->ucsdata->iso2022);
++                            opaque && !(attr & TATTR_COMBINING),
++                            (attr & ATTR_WIDE) ? ExtTextOutW2wide
++                            : ExtTextOutW2narrow);
  
              /* And the shadow bold hack. */
              if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                  SetBkMode(hdc, TRANSPARENT);
 -                ExtTextOutW(hdc, x + xoffset - 1,
-+                ExtTextOutW2(hdc, x + xoffset - 1,
++                ExtTextOutW2(!!(attr & ATTR_WIDE), hdc, x + xoffset - 1,
                              y - font_height * (lattr ==
                                                 LATTR_BOT) + text_adjust,
--                            ETO_CLIPPED, &line_box, wbuf, len, lpDx_maybe);
-+                            ETO_CLIPPED, &line_box, wbuf, len, lpDx_maybe,
-+                            !!(attr & ATTR_WIDE));
-             }
-         }
- 
-@@ -3532,10 +4197,10 @@
+                             ETO_CLIPPED, &line_box, wbuf, len, lpDx_maybe);
+@@ -3532,10 +3999,33 @@
   * Wrapper that handles combining characters.
   */
  void do_text(Context ctx, int x, int y, wchar_t *text, int len,
@@ -27750,10 +27433,33 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
      if (attr & TATTR_COMBINING) {
 -	unsigned long a = 0;
 +	unsigned long long a = 0;
++	int len0 = 1;
++	/* yoshidam: don't divide BASE char and VARIATION SELECTOR char */
++	if (len >= 2 &&
++	    IS_HIGH_SURROGATE(text[0]) && IS_LOW_SURROGATE(text[1]))
++	    len0 = 2;
++	if (len-len0 >= 1 &&
++	    ((text[len0] >= 0x180B && text[len0] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
++	    (text[len0] >= 0xFE00 && text[len0] <= 0xFE0F))) { /* VARIATION SELECTOR 1-16 */
++	    attr &= ~TATTR_COMBINING;
++	    do_text_internal(ctx, x, y, text, len0+1, attr, lattr);
++	    text += len0+1;
++	    len -= len0+1;
++	    a = TATTR_COMBINING;
++	}
++	else if (len-len0 >= 2 && text[len0] == 0xDB40 &&
++	         (text[len0+1] >= 0xDD00 && text[len0+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
++	    attr &= ~TATTR_COMBINING;
++	    do_text_internal(ctx, x, y, text, len0+2, attr, lattr);
++	    text += len0+2;
++	    len -= len0+2;
++	    a = TATTR_COMBINING;
++	}
++	else
  	attr &= ~TATTR_COMBINING;
  	while (len--) {
  	    do_text_internal(ctx, x, y, text, 1, attr | a, lattr);
-@@ -3547,13 +4212,14 @@
+@@ -3547,13 +4037,14 @@
  }
  
  void do_cursor(Context ctx, int x, int y, wchar_t *text, int len,
@@ -27769,7 +27475,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  
      lattr &= LATTR_MODE;
  
-@@ -3581,7 +4247,7 @@
+@@ -3581,7 +4072,7 @@
  	pts[2].x = pts[3].x = x + char_width - 1;
  	pts[0].y = pts[3].y = pts[4].y = y;
  	pts[1].y = pts[2].y = y + font_height - 1;
@@ -27778,7 +27484,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	Polyline(hdc, pts, 5);
  	oldpen = SelectObject(hdc, oldpen);
  	DeleteObject(oldpen);
-@@ -3606,7 +4272,7 @@
+@@ -3606,7 +4097,7 @@
  	if (attr & TATTR_ACTCURS) {
  	    HPEN oldpen;
  	    oldpen =
@@ -27787,7 +27493,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	    MoveToEx(hdc, startx, starty, NULL);
  	    LineTo(hdc, startx + dx * length, starty + dy * length);
  	    oldpen = SelectObject(hdc, oldpen);
-@@ -3614,7 +4280,7 @@
+@@ -3614,7 +4105,7 @@
  	} else {
  	    for (i = 0; i < length; i++) {
  		if (i % 2 == 0) {
@@ -27796,7 +27502,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  		}
  		startx += dx;
  		starty += dy;
-@@ -3785,6 +4451,16 @@
+@@ -3785,6 +4276,16 @@
  	}
  #endif
  
@@ -27813,7 +27519,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	if (wParam == VK_MENU && (HIWORD(lParam) & KF_EXTENDED)) {
  	    keystate[VK_RMENU] = keystate[VK_MENU];
  	}
-@@ -3812,7 +4488,7 @@
+@@ -3812,7 +4313,7 @@
  	(HIWORD(lParam) & (KF_UP | KF_REPEAT)) == KF_REPEAT)
  	return 0;
  
@@ -27822,7 +27528,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	left_alt = 1;
  
      key_down = ((HIWORD(lParam) & KF_UP) == 0);
-@@ -3906,7 +4582,7 @@
+@@ -3906,7 +4407,7 @@
      }
  
      /* If a key is pressed and AltGr is not active */
@@ -27831,7 +27537,19 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  	/* Okay, prepare for most alts then ... */
  	if (left_alt)
  	    *p++ = '\033';
-@@ -4479,6 +5155,13 @@
+@@ -3943,6 +4444,11 @@
+ 	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
+ 	    return -1;
+ 	}
++        // xxxxxxxxxxxxxxxxxxx
++	if (left_alt && wParam == VK_SPACE) {
++	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
++	    return -1;
++	}
+ 	if (left_alt && wParam == VK_RETURN && cfg.fullscreenonaltenter &&
+ 	    (cfg.resize_action != RESIZE_DISABLED)) {
+  	    if ((HIWORD(lParam) & (KF_UP | KF_REPEAT)) != KF_REPEAT)
+@@ -4479,6 +4985,13 @@
  			term_seen_key_event(term);
  			if (ldisc)
  			    luni_send(ldisc, cbuf+!left_alt, 1+!!left_alt, 1);
@@ -27845,15 +27563,96 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
  		    } else {
  			char cbuf[2];
  			cbuf[0] = '\033';
-@@ -5545,3 +6228,154 @@
+@@ -5283,11 +5796,18 @@
+ void set_iconic(void *frontend, int iconic)
+ {
+     if (IsIconic(hwnd)) {
+-	if (!iconic)
++	if (!iconic) {
+ 	    ShowWindow(hwnd, SW_RESTORE);
++	    /* Background */
++	    ShowWindow(bg_hwnd, SW_RESTORE);
++	}
+     } else {
+-	if (iconic)
++	if (iconic) {
++	    /* Background */
++	    ShowWindow(bg_hwnd, SW_MINIMIZE);
++
+ 	    ShowWindow(hwnd, SW_MINIMIZE);
++	}
+     }
+ }
+ 
+@@ -5302,6 +5822,9 @@
+        return;
+ 
+     SetWindowPos(hwnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
++
++    /* Background */
++    bg_move(1);
+ }
+ 
+ /*
+@@ -5314,6 +5837,9 @@
+ 	return;			       /* ignore */
+     SetWindowPos(hwnd, top ? HWND_TOP : HWND_BOTTOM, 0, 0, 0, 0,
+ 		 SWP_NOMOVE | SWP_NOSIZE);
++
++    /* Background */
++    bg_order();
+ }
+ 
+ /*
+@@ -5331,11 +5857,18 @@
+ void set_zoomed(void *frontend, int zoomed)
+ {
+     if (IsZoomed(hwnd)) {
+-        if (!zoomed)
++        if (!zoomed) {
+ 	    ShowWindow(hwnd, SW_RESTORE);
++	    /* Background */
++	    ShowWindow(bg_hwnd, SW_RESTORE);
++        }
+     } else {
+-	if (zoomed)
++	if (zoomed) {
++	    /* Background */
++	    ShowWindow(bg_hwnd, SW_MINIMIZE);
++
+ 	    ShowWindow(hwnd, SW_MAXIMIZE);
++        }
+     }
+ }
+ 
+@@ -5496,11 +6029,18 @@
+ static void flip_full_screen()
+ {
+     if (is_full_screen()) {
++	/* Background */
++	ShowWindow(bg_hwnd, SW_RESTORE);
++
+ 	ShowWindow(hwnd, SW_RESTORE);
+     } else if (IsZoomed(hwnd)) {
+ 	make_full_screen();
+     } else {
+ 	SendMessage(hwnd, WM_FULLSCR_ON_MAX, 0, 0);
++
++	/* Background */
++	ShowWindow(bg_hwnd, SW_MAXIMIZE);
++
+ 	ShowWindow(hwnd, SW_MAXIMIZE);
+     }
+ }
+@@ -5545,3 +6085,703 @@
      c->len = len;
      PostMessage(hwnd, WM_AGENT_CALLBACK, 0, (LPARAM)c);
  }
 +
 +/* (opt & ETO_CLIPPED) must not be zero. */
 +static void
-+ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
-+	      WCHAR *str, UINT cnt, const int *dx, int wide)
++ExtTextOutW2 (int wide, HDC hdc, int x, int y, UINT opt, const RECT *rc,
++	      WCHAR *str, UINT cnt, const int *dx)
 +{
 +  unsigned int i;
 +  SIZE s;
@@ -27863,22 +27662,48 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +  LONG cx2;
 +  extern int iso2022_win95flag;
 +
-+  if (!dx) {
-+    ExtTextOutW (hdc, x, y, opt, rc, str, cnt, dx);
-+    return;
-+  }
-+
++  if (!dx)
++    {
++      ExtTextOutW (hdc, x, y, opt, rc, str, cnt, dx);
++      return;
++    }
 +  f = 0;
 +  rc2 = *rc;
 +  w95 = wide ? iso2022_win95flag : 0;
 +  while (cnt)
 +    {
++      int clen = 1;
++      int dx1 = *dx;
++      int dx2 = 0;
 +      cx2 = 0;
-+      for (i = 0 ; i < cnt ; i++)
++      for (i = 0 ; i < cnt ; i+=clen)
 +	{
++          if (i+1<cnt && IS_HIGH_SURROGATE(str[i]) &&
++              IS_LOW_SURROGATE(str[i+1])) {
++	    GetTextExtentPoint32W (hdc, &str[i], 2, &s);
++            clen = 2;
++            dx1 = dx[i+1];
++          }
++          else {
 +	  GetTextExtentPoint32W (hdc, &str[i], 1, &s);
-+	  if ((s.cx > *dx ||
-+	       s.cx * 4 < *dx * 3) != f)
++            clen =1;
++            dx1 = dx[i];
++          }
++          if (cnt-clen >= 1 &&
++              ((str[i+clen] >= 0x180B && str[i+clen] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
++               (str[i+clen] >= 0xFE00 && str[i+clen] <= 0xFE0F))) {    /* VARIATION SELECTOR 1-16 */
++              dx1 = dx[i+clen];
++              clen++;
++          }
++          else if (cnt-clen >= 2 &&
++                   str[i+clen] == 0xDB40 &&
++                   (str[i+clen+1] >= 0xDD00 && str[i+clen+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
++              dx1 = dx[i+clen+1];
++              clen += 2;
++          }
++
++	  if ((s.cx > dx1 ||
++	       s.cx * 4 < dx1 * 3) != f)
 +	    break;
 +	  if (f && cx2 != s.cx)
 +	    {
@@ -27886,16 +27711,17 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +		break;
 +	      cx2 = s.cx;
 +	    }
++          dx2 += dx1;
 +	  if ((w95 && !f) || (0x590 <= str[i] && str[i] <= 0x5ff))
 +	    {
-+	      i++;
++	      i+=clen;
 +	      break;
 +	    }
 +	}
 +      if (i)
 +	{
 +	  cnt -= i;
-+	  rc2.right = cnt ? rc2.left + *dx * i : rc->right;
++	  rc2.right = cnt ? rc2.left + dx2 : rc->right;
 +	  if (f)
 +	    {
 +	      HDC dc;
@@ -27907,7 +27733,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +	      rc3.right = s.cx;
 +	      rc3.bottom = s.cy;
 +	      dc = CreateCompatibleDC (hdc);
-+	      bm = CreateBitmap (max (s.cx, *dx * i),
++	      bm = CreateBitmap (max (s.cx, dx2),
 +				 s.cy, 1, 1, 0);
 +	      oldbm = SelectObject (dc, bm);
 +	      SelectObject (dc, GetCurrentObject (hdc, OBJ_FONT));
@@ -27917,7 +27743,7 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +	      SetBkMode (dc, OPAQUE);
 +	      ExtTextOutW (dc, 0, 0, ETO_OPAQUE, &rc3, str, i, 0);
 +	      SetStretchBltMode (dc, BLACKONWHITE);
-+	      StretchBlt (dc, 0, 0, *dx * i, s.cy,
++	      StretchBlt (dc, 0, 0, dx2, s.cy,
 +			  dc, 0, 0, s.cx, s.cy, SRCCOPY);
 +	      {
 +		HDC dc2;
@@ -27943,11 +27769,11 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +			  SRCCOPY);
 +		SetTextColor (dc2, RGB (0, 0, 0));
 +		SetBkColor (dc2, RGB (255, 255, 255));
-+		BitBlt (dc2, x - rc2.left, y - rc2.top, *dx * i,
++		BitBlt (dc2, x - rc2.left, y - rc2.top, dx2,
 +			s.cy, dc, 0, 0, SRCAND);
 +		SetBkColor (dc2, RGB (0, 0, 0));
 +		SetTextColor (dc2, GetTextColor (hdc));
-+		BitBlt (dc2, x - rc2.left, y - rc2.top, *dx * i,
++		BitBlt (dc2, x - rc2.left, y - rc2.top, dx2,
 +			s.cy, dc, 0, 0, SRCPAINT);
 +		BitBlt (hdc, rc2.left, rc2.top, rc2.right - rc2.left,
 +			rc2.bottom - rc2.top, dc2, 0, 0,
@@ -27962,47 +27788,569 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/window.c
 +	    }
 +	  else
 +	    ExtTextOutW (hdc, x, y, opt, &rc2, str, i, dx);
-+	  x += *dx * i;
++	  x += dx2;
 +	  str += i;
++          dx += i;
++          dx2 = 0;
 +	  rc2.left = rc2.right;
 +	}
 +      f = !f;
 +    }
 +}
 +
-+static void
-+extend_glass_frame(HWND hwnd)
-+{
-+    BOOL bEnabled = FALSE;
-+    HRESULT (WINAPI *pDwmIsCompositionEnabled)(BOOL*) = NULL;
-+    HRESULT (WINAPI *pDwmExtendFrameIntoClientArea)(HWND, MARGINS*) = NULL;
-+    HMODULE hmDwmapi = NULL;
++/* Background */
++/* Transparency */
 +
-+    if (osVersion.dwMajorVersion < 6) {
++static void bg_init()
++{
++    int i, j;
++
++    for (i = 0; i < 4; i++) {
++	for (j = 0; j < 2; j++) {
++	    if (cfg.alphas_pc[i][j] > 100) {
++		cfg.alphas_pc[i][j] = 100;
++	    }
++	    if (cfg.alphas_pc[i][j] < 0) {
++		cfg.alphas_pc[i][j] = 0;
++	    }
++	    alphas[i][j] = cfg.alphas_pc[i][j] * 255 / 100;
++	    if ((alphas[i][j] == 0) && (cfg.bg_effect == BG_PLANE)) {
++		alphas[i][j] = 1;
++	    }
++	}
++    }
++
++    /* terrible hack to avoid focus lost on title bar */ 
++    if ((cfg.bg_wallpaper == BG_NONE) &&
++	(cfg.bg_effect == BG_PLANE) &&
++	(alphas[ALPHA_DEFAULT_BG][BG_ACTIVE] == 255) &&
++	(alphas[ALPHA_DEFAULT_BG][BG_INACTIVE] == 255)) {
++    } else {
++	int r = GetRValue(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
++	int g = GetGValue(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
++	int b = GetBValue(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
++	if ((r == g) && (r == b)) {
++	    if (r) {
++		colours[(ATTR_DEFBG>>ATTR_BGSHIFT)] -= 1;
++	    } else {
++		colours[(ATTR_DEFBG>>ATTR_BGSHIFT)] += 1;
++	    }
++	}
++    }
++
++    /*  aero functions */
++    if (!p_DwmIsCompositionEnabled && (osVersion.dwMajorVersion > 5)) {
++	HMODULE hmLib = NULL;
++	hmLib = load_system32_dll("Dwmapi.dll");
++	if (hmLib) {
++	    GET_WINDOWS_FUNCTION(hmLib, DwmIsCompositionEnabled);
++	    GET_WINDOWS_FUNCTION(hmLib, DwmExtendFrameIntoClientArea);
++	    GET_WINDOWS_FUNCTION(hmLib, DwmEnableBlurBehindWindow);
++	}
++	hmLib = load_system32_dll("UxTheme.dll");
++	if (hmLib) {
++	    GET_WINDOWS_FUNCTION(hmLib, EndBufferedPaint);
++	    GET_WINDOWS_FUNCTION(hmLib, BeginBufferedPaint);
++	    GET_WINDOWS_FUNCTION(hmLib, BufferedPaintSetAlpha);
++	}
++    }
++}
++
++static void bg_create()
++{
++    const char *const bgname = "PuTTYbg";
++
++    RECT rc;
++    POINT po = {0, 0};
++    BYTE a;
++    WNDCLASSEX wc;
++
++    if (bg_hwnd) {
++	DestroyWindow(bg_hwnd);
++	bg_hwnd = NULL;
++	UnregisterClass(bgname, hinst);
++    }
++
++    if ((cfg.bg_wallpaper == BG_NONE) &&
++	(cfg.bg_effect == BG_PLANE) &&
++	(alphas[ALPHA_DEFAULT_BG][BG_ACTIVE] == 255) &&
++	(alphas[ALPHA_DEFAULT_BG][BG_INACTIVE] == 255)) {
++	SetWindowLongPtr(hwnd, GWL_EXSTYLE,
++			 GetWindowLongPtr(hwnd, GWL_EXSTYLE) & ~WS_EX_LAYERED);
 +	return;
 +    }
 +
-+    hmDwmapi = load_system32_dll("dwmapi.dll");
++    wc.cbClsExtra = 0;
++    wc.cbSize = sizeof(WNDCLASSEX);
++    wc.cbWndExtra = 0;
++    wc.hbrBackground = NULL;
++    wc.hCursor = LoadCursor(NULL, IDC_IBEAM);
++    wc.hIcon = NULL;
++    wc.hIconSm = NULL;
++    wc.hInstance = hinst;
++    wc.lpfnWndProc = (WNDPROC)bg_WndProc;
++    wc.lpszClassName = bgname;
++    wc.lpszMenuName = NULL;
++    wc.style = 0;
 +
-+    if (hmDwmapi) {
-+	pDwmIsCompositionEnabled =
-+	    GetProcAddress(hmDwmapi, "DwmIsCompositionEnabled");
-+	pDwmExtendFrameIntoClientArea =
-+	    GetProcAddress(hmDwmapi, "DwmExtendFrameIntoClientArea");
-+    }
-+    if (pDwmIsCompositionEnabled) {
-+	pDwmIsCompositionEnabled(&bEnabled);
-+    }
-+    if (bEnabled && pDwmExtendFrameIntoClientArea) {
-+	MARGINS margins = {-1, 0, 0, 0};
-+	pDwmExtendFrameIntoClientArea(hwnd, &margins);
-+    }
++    RegisterClassEx(&wc);
 +
-+    FreeLibrary(hmDwmapi);
++    bg_hwnd = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE |
++			     WS_EX_LAYERED,
++			     bgname, "",
++			     WS_POPUP,
++			     0, 0, 0, 0,
++			     NULL, NULL, hinst, NULL);
++
++    /*  position */
++    GetClientRect(hwnd, &rc);
++    ClientToScreen(hwnd, &po);
++    SetWindowPos(bg_hwnd, hwnd, 
++		 po.x, po.y, rc.right - rc.left, rc.bottom - rc.top,
++		 SWP_NOACTIVATE);
++
++    /*  color */
++    if (bg_br) {
++	DeleteObject(bg_br);
++    }
++    bg_br = CreateSolidBrush(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
++    SetClassLongPtr(bg_hwnd, GCLP_HBRBACKGROUND, (LONG)bg_br);
++
++    /*  background, wallpaper */
++    bm_create();
++    wp_create();
++
++    /*  aero glass */
++    bg_glass();
++
++    /*  transparent */
++    SetWindowLongPtr(hwnd, GWL_EXSTYLE,
++		     GetWindowLongPtr(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
++    SetLayeredWindowAttributes(hwnd,
++			       colours[(ATTR_DEFBG >> ATTR_BGSHIFT)], 0,
++			       LWA_COLORKEY);
++    /*     a = alphas[ALPHA_WINDOW][BG_ACTIVE]; */
++    /*     SetLayeredWindowAttributes(hwnd, 0, a, LWA_ALPHA); */
++    a = ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) ?
++	255 : alphas[ALPHA_DEFAULT_BG][BG_ACTIVE];
++    SetLayeredWindowAttributes(bg_hwnd, 0, a, LWA_ALPHA);
++
++    /*  show */
++    ShowWindow(bg_hwnd, SW_SHOWNOACTIVATE);
++    InvalidateRect(bg_hwnd, NULL, TRUE);
++    InvalidateRect(hwnd, NULL, TRUE);
++    /*  UpdateWindow(bg_hwnd); */
++    /*  UpdateWindow(hwnd); */
 +}
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winhelp.h
---- a/windows/winhelp.h	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winhelp.h	Thu Dec 29 18:25:25 2011 +0900
++
++static void bm_create()
++{
++    static HBITMAP bm_bm = NULL;
++    static HBITMAP bm_bm_old = NULL;
++
++    BITMAP bm;
++
++    if (bm_bm != NULL) {
++	if (bm_dc != NULL) {
++	    SelectObject(bm_dc, bm_bm_old);
++	    DeleteDC(bm_dc);
++	    bm_dc = NULL;
++	}
++	DeleteObject(bm_bm);
++	bm_bm = NULL;
++    }
++
++    if ((cfg.bg_wallpaper == BG_NONE) | (cfg.bg_wallpaper == BG_DESKTOP)) {
++	return;
++    }
++    if (cfg.wp_file.path == NULL || strlen(cfg.wp_file.path) == 0) {
++	return;
++    }
++
++    bm_bm = LoadImage(NULL, cfg.wp_file.path, IMAGE_BITMAP, 0, 0,
++		      LR_LOADFROMFILE | LR_CREATEDIBSECTION);
++    if (bm_bm == NULL) {
++	return;
++    }
++
++    GetObject(bm_bm, sizeof(BITMAP), &bm);
++    bm_width=bm.bmWidth;
++    bm_height=bm.bmHeight;
++
++    bm_dc = CreateCompatibleDC(GetDC(bg_hwnd));
++    bm_bm_old = SelectObject(bm_dc, bm_bm);
++
++    return;
++}
++
++
++static void wp_create()
++{
++    static HBITMAP wp_bm = NULL;
++    static HBITMAP wp_bm_old = NULL;
++
++    int win_width = 0;
++    int win_height = 0;
++    int stretch_width = 0;
++    int stretch_height = 0;
++    int offset_x = 0;
++    int offset_y = 0;
++
++    int stretch = 0;
++    HRGN hrgn = NULL;
++    RECT rc;
++
++    HPALETTE hpal = NULL;
++    HPALETTE hpal_old;
++
++    enum {
++	STRETCH_NONE, STRETCH_WIDTH, STRETCH_HEIGHT, STRETCH_BOTH
++    };
++
++    if (wp_bm != NULL) {
++	if (wp_dc != NULL) {
++	    SelectObject(wp_dc, wp_bm_old);
++	    DeleteDC(wp_dc);
++	    wp_dc = NULL;
++	}
++	DeleteObject(wp_bm);
++	wp_bm = NULL;
++    }
++
++    if (bm_dc == NULL) {
++	return;
++    }
++
++    if (cfg.bg_wallpaper == BG_FILE) {
++	GetClientRect(hwnd, &rc);
++	win_width = rc.right - rc.left;
++	win_height = rc.bottom - rc.top;
++    } else if (cfg.bg_wallpaper == BG_FILE_DESKTOP) {
++	win_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
++	win_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
++	rc.left = 0;
++	rc.top = 0;
++	rc.right = win_width;
++	rc.bottom = win_height;
++    } else {
++	return;
++    }
++
++    wp_dc = CreateCompatibleDC(GetDC(bg_hwnd));
++    wp_bm = CreateCompatibleBitmap(GetDC(bg_hwnd), win_width, win_height);
++    wp_bm_old = SelectObject(wp_dc, wp_bm);
++
++    SetStretchBltMode(wp_dc, HALFTONE);
++    hpal = CreateHalftonePalette(wp_dc);
++    hpal_old = SelectPalette(wp_dc, hpal, FALSE);
++    RealizePalette(wp_dc);
++
++    FillRect(wp_dc, &rc, bg_br);
++
++    switch (cfg.wp_position) {
++    case WP_FILL:
++	stretch = ((win_width * bm_height) > (win_height * bm_width)) ?
++	    STRETCH_WIDTH : STRETCH_HEIGHT;
++	break;
++    case WP_FIT:
++	stretch = ((win_width * bm_height) > (win_height * bm_width)) ?
++	    STRETCH_HEIGHT : STRETCH_WIDTH;
++	break;
++    case WP_STRETCH:
++	stretch = STRETCH_BOTH;
++	break;
++    case WP_TILE:
++    case WP_FIX:
++	stretch = STRETCH_NONE;
++	break;
++    }
++
++    switch (stretch) {
++    case STRETCH_NONE:
++	offset_x =
++	    (cfg.wp_align == WP_LEFT) ? 0 :
++	(cfg.wp_align == WP_CENTER) ? (win_width - bm_width) / 2 :
++	(cfg.wp_align == WP_RIGHT) ? win_width - bm_width : 0;
++	offset_y =
++	    (cfg.wp_valign == WP_TOP) ? 0 :
++	    (cfg.wp_valign == WP_MIDDLE) ? (win_height - bm_height) / 2:
++	    (cfg.wp_valign == WP_BOTTOM) ? win_height - bm_height : 0;
++	if (cfg.wp_position == WP_TILE) {
++	    int m = offset_x % bm_width;
++	    int n = offset_y % bm_height;
++	    int y = n ? n - bm_height : 0;
++	    for (; y <= win_height - n ; y += bm_height) {
++		int x = m ? m - bm_width : 0;
++		for (; x <= win_width - m ; x += bm_width) {
++		    BitBlt(wp_dc, x, y, bm_width, bm_height,
++			   bm_dc, 0, 0, SRCCOPY);
++		}
++	    }
++	} else {
++	    hrgn = CreateRectRgn(offset_x, offset_y,
++				 offset_x + bm_width, offset_y + bm_height);
++	    SelectClipRgn(wp_dc, hrgn);
++	    BitBlt(wp_dc, offset_x , offset_y, win_width, win_height,
++		   bm_dc, 0, 0, SRCCOPY);
++	}
++	break;
++    case STRETCH_WIDTH:
++	stretch_width = win_width;
++	stretch_height = bm_height * win_width / bm_width;;
++	offset_x = 0;
++	offset_y =
++	    (cfg.wp_valign == WP_TOP) ? 0 :
++	    (cfg.wp_valign == WP_MIDDLE) ? (win_height - stretch_height) / 2:
++	    (cfg.wp_valign == WP_BOTTOM) ? win_height - stretch_height : 0;
++	if (stretch_height < win_height) {
++	    hrgn = CreateRectRgn(offset_x, offset_y,
++				 offset_x + stretch_width,
++				 offset_y + stretch_height);
++	    SelectClipRgn(wp_dc, hrgn);
++	}
++	StretchBlt(wp_dc, offset_x, offset_y, stretch_width, stretch_height,
++		   bm_dc, 0, 0, bm_width, bm_height, SRCCOPY);
++	break;
++    case STRETCH_HEIGHT:
++	stretch_width = bm_width * win_height / bm_height;;
++	stretch_height = win_height;
++	offset_x =
++	    (cfg.wp_align == WP_LEFT) ? 0 :
++	    (cfg.wp_align == WP_CENTER) ? (win_width - stretch_width) / 2 :
++	    (cfg.wp_align == WP_RIGHT) ? win_width - stretch_width : 0;
++	offset_y = 0;
++	if (stretch_width < win_width) {
++	    hrgn = CreateRectRgn(offset_x, offset_y,
++				 offset_x + stretch_width,
++				 offset_y + stretch_height);
++	    SelectClipRgn(wp_dc, hrgn);
++	}
++	StretchBlt(wp_dc, offset_x, offset_y, stretch_width, stretch_height,
++		   bm_dc, 0, 0, bm_width, bm_height, SRCCOPY);
++	break;
++    case STRETCH_BOTH:
++	StretchBlt(wp_dc, 0, 0, win_width, win_height,
++		   bm_dc, 0, 0, bm_width, bm_height, SRCCOPY);
++	break;
++    }
++
++    if (hpal) {
++	SelectPalette(wp_dc, hpal_old, FALSE);
++	DeleteObject(hpal);
++	hpal = NULL;
++    }
++
++    if (hrgn) {
++	SelectClipRgn(wp_dc, NULL);
++	DeleteObject(hrgn);
++	hrgn = NULL;
++    }
++
++    return;
++}
++
++static void wp_draw(HDC hdc, RECT *rc) {
++    HRGN rectrgn;
++    POINT po;
++    BOOL r;
++
++    switch (cfg.bg_wallpaper) {
++    case BG_NONE:
++	if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
++	    FillRect(hdc, rc, bg_br);
++	}
++	break;
++    case BG_FILE:
++	r = BitBlt(hdc, rc->left, rc->top,
++		   rc->right - rc->left, rc->bottom - rc->top,
++		   wp_dc, rc->left, rc->top, SRCCOPY);
++	break;
++    case BG_FILE_DESKTOP:
++	po.x = rc->left;
++	po.y = rc->top;
++	ClientToScreen(bg_hwnd, &po);
++	BitBlt(hdc, rc->left, rc->top,
++	       rc->right - rc->left, rc->bottom - rc->top,
++	       wp_dc, po.x, po.y, SRCCOPY);
++	break;
++    case BG_DESKTOP:
++	rectrgn = CreateRectRgnIndirect(rc);
++	SelectClipRgn(hdc, rectrgn);
++	PaintDesktop(hdc);
++	SelectClipRgn(hdc, NULL);
++	DeleteObject(rectrgn);
++	break;
++    }
++}
++
++static LRESULT CALLBACK bg_WndProc(HWND bg_hwnd, UINT message,
++				   WPARAM wParam, LPARAM lParam)
++{
++    POINT cursorpos;
++
++    switch (message) {
++    case WM_LBUTTONDOWN:
++    case WM_MBUTTONDOWN:
++    case WM_RBUTTONDOWN:
++    case WM_LBUTTONUP:
++    case WM_MBUTTONUP:
++    case WM_RBUTTONUP:
++	SetForegroundWindow(hwnd);
++	cursorpos.x = X_POS(lParam);
++	cursorpos.y = Y_POS(lParam);
++	ClientToScreen(bg_hwnd, &cursorpos);
++	ScreenToClient(hwnd, &cursorpos);
++	ReleaseCapture();
++	SendMessage(hwnd, message, wParam, MAKELPARAM(cursorpos.x, cursorpos.y));
++	return 0;
++    case WM_MOUSEACTIVATE:
++	return MA_NOACTIVATE;
++    case WM_PAINT: {
++	PAINTSTRUCT p;
++	HDC hdc;
++	hdc = BeginPaint(bg_hwnd, &p);
++
++	if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
++	    HPAINTBUFFER hpb = NULL;
++	    HDC phdc;
++	    BP_PAINTPARAMS pp = {sizeof(pp)};
++
++	    pp.dwFlags = BPPF_ERASE;
++	    hpb = p_BeginBufferedPaint(p.hdc, &p.rcPaint, BPBF_TOPDOWNDIB, &pp, &phdc);
++	    if (hpb && phdc) {
++		wp_draw(phdc, &p.rcPaint);
++		p_BufferedPaintSetAlpha(hpb, NULL,
++					alphas[ALPHA_DEFAULT_BG][bg_active]);
++		p_EndBufferedPaint(hpb, TRUE);
++	    }
++
++	    DeleteDC(phdc);
++	} else {
++	    wp_draw(hdc, &p.rcPaint);
++	}
++
++	EndPaint(bg_hwnd, &p);
++	return 0;
++    }
++    case WM_SIZE:
++	/*	 AnimateWindow(bg_hwnd, 1000, AW_SLIDE); */
++	/*       ShowWindow(bg_hwnd, SW_HIDE); */
++	break;
++    case WM_ERASEBKGND:
++	if ((cfg.bg_wallpaper == BG_FILE_DESKTOP) ||
++	    (cfg.bg_wallpaper == BG_DESKTOP)) {
++	  return FALSE;
++	}
++	break;
++    default:
++	break;
++    }
++
++    return DefWindowProc(bg_hwnd, message, wParam, lParam);
++}
++
++
++static void bg_resize(int draw)
++{
++    RECT rc;
++    POINT po = {0, 0};
++
++    if (!bg_hwnd) {
++	return;
++    }
++
++    GetClientRect(hwnd, &rc);
++    ClientToScreen(hwnd, &po);
++    SetWindowPos(bg_hwnd, hwnd, 
++		 po.x, po.y, rc.right - rc.left, rc.bottom - rc.top,
++		 SWP_NOACTIVATE);
++
++    if (draw) {
++	wp_create();
++	InvalidateRect(bg_hwnd, NULL, FALSE);
++    }
++}
++
++
++static void bg_move(int draw)
++{
++    POINT po = {0, 0};
++
++    if (!bg_hwnd) {
++	return;
++    }
++
++    ClientToScreen(hwnd, &po);
++    SetWindowPos(bg_hwnd, hwnd, 
++		 po.x, po.y, 0, 0,
++		 SWP_NOSIZE | SWP_NOACTIVATE);
++
++    if ((draw || cfg.wp_moving) &&
++	((cfg.bg_wallpaper == BG_FILE_DESKTOP) ||
++	 (cfg.bg_wallpaper == BG_DESKTOP))) {
++	InvalidateRect(bg_hwnd, NULL, FALSE);
++    }
++}
++
++
++static void bg_order()
++{
++    if (!bg_hwnd) {
++	return;
++    }
++
++    SetWindowPos(bg_hwnd, hwnd, 0, 0, 0, 0,
++		 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
++}
++
++
++static void bg_glass()
++{
++    DWM_BLURBEHIND bb = {DWM_BB_ENABLE, FALSE};
++    MARGINS margins = {0};
++
++    BOOL bEnabled = FALSE;
++
++    if (p_DwmIsCompositionEnabled) {
++	p_DwmIsCompositionEnabled(&bEnabled);
++    }
++    if (!bEnabled) {
++	return;
++    }
++
++    if (cfg.bg_effect == BG_DOUBLE_GLASS) {
++	margins.cxLeftWidth = -1;
++    }
++    p_DwmExtendFrameIntoClientArea(hwnd, &margins);
++
++    if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
++	bb.fEnable = TRUE;
++    }
++    p_DwmEnableBlurBehindWindow(bg_hwnd, &bb);
++}
++
++
++static void bg_trans()
++{
++    if (!bg_hwnd) {
++	return;
++    }
++
++    if (alphas[ALPHA_DEFAULT_BG][BG_ACTIVE] ==
++	alphas[ALPHA_DEFAULT_BG][BG_INACTIVE]) {
++	return;
++    }
++    if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
++	InvalidateRect(bg_hwnd, NULL, FALSE);
++    } else {
++	SetLayeredWindowAttributes(bg_hwnd, 0,
++				   alphas[ALPHA_DEFAULT_BG][bg_active],
++				   LWA_ALPHA);
++    }
++}
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winhelp.h
+--- a/windows/winhelp.h	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winhelp.h	Mon Jan 30 23:51:03 2012 +0900
 @@ -118,6 +118,7 @@
  #define WINHELP_CTX_selection_charclasses "selection.charclasses:config-charclasses"
  #define WINHELP_CTX_selection_linedraw "selection.linedraw:config-linedrawpaste"
@@ -28011,9 +28359,718 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winhelp.h
  #define WINHELP_CTX_colours_ansi "colours.ansi:config-ansicolour"
  #define WINHELP_CTX_colours_xterm256 "colours.xterm256:config-xtermcolour"
  #define WINHELP_CTX_colours_bold "colours.bold:config-boldcolour"
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winmisc.c
---- a/windows/winmisc.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winmisc.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winl10n.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/windows/winl10n.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -0,0 +1,669 @@
++#include <winsock2.h>
++#include <windows.h>
++#include <commctrl.h>
++#include <string.h>
++#include <stdio.h>
++#include "putty.h"
++
++static char lngfile[MAX_PATH];
++static char lang[32];
++static char ofontname[128];
++static HFONT hfont;
++static char x[1024];
++static WNDPROC orig_wndproc_button, orig_wndproc_static,
++  orig_wndproc_systreeview32, orig_wndproc_edit, orig_wndproc_listbox, orig_wndproc_combobox;
++static int collect = 0;
++static BOOL CALLBACK
++defdlgproc (HWND a1, UINT a2, WPARAM a3, LPARAM a4)
++{
++  return 0;
++}
++struct prop
++{
++  WNDPROC oldproc;
++  DLGPROC olddlgproc;
++} defaultprop = { DefWindowProc, defdlgproc };
++static char propstr[] = "l10n";
++static DLGPROC lastolddlgproc;
++
++#define HOOK_TREEVIEW "xSysTreeView32"
++
++static char *
++aa (char *p)
++{
++  int i, n;
++
++  n = strlen (p);
++  for (i = 0 ; i < 1023 && *p ; i++)
++    {
++      if (i == 0 && *p == ' ' || (*p > 0 && *p < 32) || *p == '=' || *p == '%')
++	{
++	  x[i++] = '%';
++	  x[i++] = "0123456789ABCDEF"[(*p>>4)&15];
++	  x[i] = (*p++&15)["0123456789ABCDEF"];
++	}
++      else
++	x[i] = *p++;
++    }
++  if (i > 0 && x[i - 1] == ' ') {
++      x[i - 1] = '%';
++      x[i++] = '2';
++      x[i++] = '0';
++  }
++  x[i] = '\0';
++  return x;
++}
++
++static DWORD
++getl10nstr (char *a, char *b, char *c, int n)
++{
++  DWORD r;
++
++  {
++    char* p = a;
++    while (*p != '\0') {
++      if (IsDBCSLeadByte(*p)) {
++        strncpy(c, b, n);
++        c[n - 1] = '\0';
++        return strlen(c);
++      }
++      p++;
++    }
++  }
++
++  r = GetPrivateProfileString (lang, aa (a), "\n:", c, n, lngfile);
++  if (c[0] == '\n') {
++      if (collect > 0 && (int) strlen(a) > collect) {
++          char buf[1024];
++          strcpy(buf, x);
++          WritePrivateProfileString(lang, buf, aa(b), lngfile);
++      }
++      strncpy(c, b, n);
++      c[n - 1] = '\0';
++      return strlen(c);
++  }
++  for (a = c ; (*a = *c) ; a++, c++)
++    {
++      if (*c == '%')
++	{
++	  int d, e;
++
++	  if (c[1] >= '0' && c[1] <= '9')
++	    d = c[1] - '0';
++	  else if (c[1] >= 'A' && c[1] <= 'F')
++	    d = c[1] - 'A' + 10;
++	  else
++	    continue;
++	  if (c[2] >= '0' && c[2] <= '9')
++	    e = c[2] - '0';
++	  else if (c[2] >= 'A' && c[2] <= 'F')
++	    e = c[2] - 'A' + 10;
++	  else
++	    continue;
++	  *a = d * 16 + e;
++	  c += 2;
++	}
++    }
++  return r;
++}
++
++static void
++domenu (HMENU menu)
++{
++  int i, n;
++  char a[256];
++  MENUITEMINFO b;
++
++  n = GetMenuItemCount (menu);
++  for (i = 0 ; i < n ; i++)
++    {
++      b.cbSize = sizeof (MENUITEMINFO);
++      b.fMask = MIIM_TYPE;
++      b.dwTypeData = a;
++      b.cch = 256;
++      if (GetMenuItemInfo (menu, i, 1, &b))
++	if (getl10nstr (a, "", a, 256))
++	  SetMenuItemInfo (menu, i, 1, &b);
++    }
++}
++
++static LRESULT CALLBACK
++wndproc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++  struct prop *p;
++
++  p = GetProp (hwnd, propstr);
++  if (!p)
++    p = &defaultprop;
++  proc = p->oldproc;
++  switch (msg)
++    {
++    case WM_DESTROY:
++      RemoveProp (hwnd, propstr);
++      LocalFree ((HANDLE)p);
++      SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR)proc);
++      break;
++    case WM_INITMENUPOPUP:
++      domenu ((HMENU)wparam);
++      break;
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT
++hook_setfont (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  LOGFONT a;
++
++  if (wparam && GetObject ((HGDIOBJ)wparam, sizeof (a), &a))
++    {
++      if (!stricmp (a.lfFaceName, ofontname))
++	return CallWindowProc (proc, hwnd, msg, (WPARAM)hfont, lparam);
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT
++hook_create (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  char a[256], b[256];
++  LRESULT r;
++
++  r = CallWindowProc (proc, hwnd, msg, (WPARAM)hfont, lparam);
++  if (GetWindowText (hwnd, a, 256))
++    if (getl10nstr (a, "", b, 256))
++      SetWindowText (hwnd, b);
++  return r;
++}
++
++static LRESULT
++hook_tvm_insertitem (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  TVINSERTSTRUCT *p;
++  char *q;
++  char a[256];
++  LRESULT r;
++
++  p = (TVINSERTSTRUCT *)lparam;
++  q = p->item.pszText;
++  if (getl10nstr (q, "", a, 256))
++    p->item.pszText = a;
++  r = CallWindowProc (proc, hwnd, msg, wparam, lparam);
++  p->item.pszText = q;
++  return r;
++}
++
++static LRESULT
++hook_tvm_getitem (WNDPROC proc, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  TVITEM *p;
++  char *q;
++  char a[256];
++  int l;
++  LRESULT r;
++
++  p = (TVITEM *)lparam;
++  q = p->pszText;
++  l = p->cchTextMax;
++  p->pszText = a;
++  p->cchTextMax = 256;
++  r = CallWindowProc (proc, hwnd, msg, wparam, lparam);
++  p->pszText = q;
++  p->cchTextMax = l;
++  getl10nstr (a, a, a, 256);
++  strncpy (q, a, l);
++  return r;
++}
++
++static LRESULT CALLBACK
++wndproc_button (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++
++  proc = orig_wndproc_button;
++  switch (msg)
++    {
++    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
++    case WM_CREATE: return hook_create (proc, hwnd, msg, wparam, lparam);
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT CALLBACK
++wndproc_static (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++
++  proc = orig_wndproc_static;
++  switch (msg)
++    {
++    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
++    case WM_CREATE: return hook_create (proc, hwnd, msg, wparam, lparam);
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT CALLBACK
++wndproc_systreeview32 (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++
++  proc = orig_wndproc_systreeview32;
++  switch (msg)
++    {
++    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
++    case TVM_INSERTITEM: return hook_tvm_insertitem (proc, hwnd, msg, wparam, lparam);
++    case TVM_GETITEM: return hook_tvm_getitem (proc, hwnd, msg, wparam, lparam);
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT CALLBACK
++wndproc_edit (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++
++  proc = orig_wndproc_edit;
++  switch (msg)
++    {
++    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT CALLBACK
++wndproc_listbox (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++
++  proc = orig_wndproc_listbox;
++  switch (msg)
++    {
++    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
++    case LB_ADDSTRING:
++        {
++          char buffer[256];
++          char* text = (char*) lparam;
++          if (getl10nstr (text, "", buffer, 256))
++              text = buffer;
++          return CallWindowProc (proc, hwnd, msg, wparam, (LPARAM) text);
++        }
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT CALLBACK
++wndproc_combobox (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++  WNDPROC proc;
++
++  proc = orig_wndproc_combobox;
++  switch (msg)
++    {
++    case WM_SETFONT: return hook_setfont (proc, hwnd, msg, wparam, lparam);
++    case CB_ADDSTRING:
++        {
++          char buffer[256];
++          char* text = (char*) lparam;
++          if (getl10nstr (text, "", buffer, 256))
++              text = buffer;
++          return CallWindowProc (proc, hwnd, msg, wparam, (LPARAM) text);
++        }
++    }
++  return CallWindowProc (proc, hwnd, msg, wparam, lparam);
++}
++
++static int getEnabled ()
++{
++  static int enabled = -1;
++  if (enabled == -1)
++    {
++  int i;
++  char fontname[128];
++  int fontsize;
++  struct
++  {
++    char *classname;
++    char *newclassname;
++    WNDPROC *orig_wndproc;
++    WNDPROC new_wndproc;
++  } b[] =
++    {
++      { "Button", "xButton", &orig_wndproc_button, wndproc_button },
++      { "Static", "xStatic", &orig_wndproc_static, wndproc_static },
++      { WC_TREEVIEW, HOOK_TREEVIEW, &orig_wndproc_systreeview32, wndproc_systreeview32 },
++      { "Edit", "xEdit", &orig_wndproc_edit, wndproc_edit },
++      { "ListBox", "xListBox", &orig_wndproc_listbox, wndproc_listbox },
++      { "ComboBox", "xComboBox", &orig_wndproc_combobox, wndproc_combobox },
++      { NULL }
++    };
++
++  enabled = 0;
++  GetModuleFileName (0, lngfile, MAX_PATH);
++  for (i = strlen (lngfile) ; i >= 0 ; i--)
++    if (lngfile[i] == '.')
++      break;
++  if (i >= 0)
++    {
++      strcpy (&lngfile[i + 1], "lng");
++      if (GetPrivateProfileString ("Default", "Language", "", lang, 32,
++				   lngfile))
++	{
++	  enabled = 1;
++	  GetPrivateProfileString (lang, "_FONTNAME_", "System", fontname, 128,
++				   lngfile);
++	  GetPrivateProfileString (lang, "_OFONTNAME_", "MS Sans Serif",
++				   ofontname, 128, lngfile);
++	  fontsize = GetPrivateProfileInt(lang, "_FONTSIZE_", 10, lngfile);
++	  hfont = CreateFont (fontsize, 0, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET,
++			      0, 0, 0, 0, fontname);
++	  for (i = 0; b[i].classname != NULL; i++)
++	    {
++	      WNDCLASS wndclass;
++	      HINSTANCE hinst = GetModuleHandle(NULL);
++
++	      GetClassInfo (hinst, b[i].classname, &wndclass);
++	      wndclass.hInstance = hinst;
++	      wndclass.lpszClassName = b[i].newclassname;
++	      *b[i].orig_wndproc = wndclass.lpfnWndProc;
++	      wndclass.lpfnWndProc = b[i].new_wndproc;
++	      RegisterClass (&wndclass);
++	    }
++	  collect = GetPrivateProfileInt(lang, "_COLLECT_", 0, lngfile);
++	}
++    }
++  }
++  return enabled;
++}
++
++int get_l10n_setting(const char* keyname, char* buf, int size)
++{
++    if (getEnabled()) {
++        GetPrivateProfileString (lang, keyname, "\n:", buf, size, lngfile);
++        if (*buf != '\n')
++            return 1;
++    }
++    *buf = '\0';
++    return 0;
++}
++
++static HWND
++aftercreate (HWND r)
++{
++  char classname[256];
++  char windowname[256];
++  DWORD style;
++  HWND parent;
++  struct prop *qq;
++  char buf[256];
++  enum { TYPE_OFF, TYPE_MAIN, TYPE_OTHER } type;
++
++  if (!r)
++    return r;
++  GetClassName (r, classname, 256);
++  GetWindowText (r, windowname, 256);
++  style = GetWindowLong (r, GWL_STYLE);
++  parent = GetParent (r);
++  type = TYPE_OFF;
++  if (!(style & WS_CHILD))
++    {
++      if (!strcmp (classname, "PuTTY"))
++	type = TYPE_MAIN;
++      else if (getl10nstr (windowname, "", buf, 256))
++	type = TYPE_OTHER;
++    }
++  if (type == TYPE_OFF)
++    return r;
++  if (type == TYPE_OTHER)
++    {
++      if (GetWindowText (r, buf, 256))
++	if (getl10nstr (buf, "", buf, 256))
++	  SetWindowText (r, buf);
++    }
++  if (type == TYPE_MAIN)
++    do
++      {
++	qq = (struct prop *)LocalAlloc (0, sizeof *qq);
++	if (!qq)
++	  break;
++	if (!SetProp (r, propstr, (HANDLE)qq))
++	  {
++	    LocalFree ((HANDLE)qq);
++	    break;
++	  }
++	*qq = defaultprop;
++	qq->oldproc = (WNDPROC)SetWindowLongPtr (r, GWLP_WNDPROC,
++						 (LONG_PTR)wndproc);
++      }
++    while (0);
++  return r;
++}
++
++static void
++aftercreate2 (HWND hwnd)
++{
++  HWND a;
++  LOGFONT l;
++  char buf[256];
++
++  a = GetWindow (hwnd, GW_CHILD);
++  while (a)
++    {
++      aftercreate2 (a);
++      if (GetWindowText (a, buf, 256))
++	if (getl10nstr (buf, "", buf, 256))
++	  SetWindowText (a, buf);
++      if (GetObject ((HGDIOBJ)SendMessage (a, WM_GETFONT, 0, 0),
++		     sizeof (l), &l))
++	{
++	  if (!stricmp (l.lfFaceName, ofontname))
++	    SendMessage (a, WM_SETFONT, (WPARAM)hfont,
++			 MAKELPARAM (TRUE, 0));
++	}
++      a = GetWindow (a, GW_HWNDNEXT);
++    }
++}
++
++static BOOL CALLBACK
++dlgproc (HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
++{
++  DLGPROC proc;
++  struct prop *p;
++
++  if (message == WM_INITDIALOG)
++    {
++      aftercreate (hwnd);
++      aftercreate2 (hwnd);
++      p = (struct prop *)LocalAlloc (0, sizeof (*p));
++      if (p && !SetProp (hwnd, propstr, (HANDLE)p))
++	LocalFree ((HANDLE)p);
++      else
++	*p = defaultprop;
++    }
++  p = GetProp (hwnd, propstr);
++  if (!p)
++    p = &defaultprop;
++  if (message == WM_INITDIALOG)
++    p->olddlgproc = lastolddlgproc;
++  proc = p->olddlgproc;
++  return proc (hwnd, message, wparam, lparam);
++}
++
++#undef MessageBoxA
++int
++xMessageBoxA (HWND a1, LPCSTR a2, LPCSTR a3, UINT a4)
++{
++  char *b2 = (char *)a2, *b3 = (char *)a3;
++  char c2[256], c3[256];
++
++  if (!getEnabled())
++    return MessageBoxA (a1, a2, a3, a4);
++  if (getl10nstr (b2, "", c2, 256))
++    b2 = c2;
++  if (getl10nstr (b3, "", c3, 256))
++    b3 = c3;
++  return MessageBoxA (a1, b2, b3, a4);
++}
++
++#undef CreateWindowExA
++HWND
++xCreateWindowExA (DWORD a1, LPCSTR a2, LPCSTR a3, DWORD a4, int a5, int a6,
++		 int a7, int a8, HWND a9, HMENU a10, HINSTANCE a11, LPVOID a12)
++{
++  HWND r;
++
++  if (getEnabled() && IsBadStringPtr (a2, 100) == FALSE)
++    {
++      if (stricmp (a2, WC_TREEVIEW) == 0) a2 = HOOK_TREEVIEW;
++      else if (stricmp (a2, "Button") == 0) a2 = "xButton";
++      else if (stricmp (a2, "Static") == 0) a2 = "xStatic";
++      else if (stricmp (a2, "Edit") == 0) a2 = "xEdit";
++      else if (stricmp (a2, "ListBox") == 0) a2 = "xListBox";
++      else if (stricmp (a2, "ComboBox") == 0) a2 = "xComboBox";
++    }
++  r = CreateWindowExA (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12);
++  if (!getEnabled())
++    return r;
++  return aftercreate (r);
++}
++
++#undef DialogBoxParamA
++int
++xDialogBoxParamA (HINSTANCE a1, LPCSTR a2, HWND a3, DLGPROC a4, LPARAM a5)
++{
++  if (!getEnabled())
++    return DialogBoxParamA (a1, a2, a3, a4, a5);
++  lastolddlgproc = a4;
++  return DialogBoxParamA (a1, a2, a3, dlgproc, a5);
++}
++
++#undef CreateDialogParamA
++HWND
++xCreateDialogParamA (HINSTANCE a1, LPCSTR a2, HWND a3, DLGPROC a4, LPARAM a5)
++{
++  HWND r;
++
++  r = CreateDialogParamA (a1, a2, a3, a4, a5);
++  if (getEnabled())
++    {
++      aftercreate (r);
++      aftercreate2 (r);
++    }
++  return r;
++}
++
++char *
++l10n_dupstr (char *s)
++{
++  char *a = s;
++  char b[256];
++
++  if (getEnabled() && getl10nstr (s, "", b, 256))
++    a = b;
++  return dupstr (a);
++}
++
++void
++l10n_created_window (HWND hwnd)
++{
++  if (getEnabled())
++    aftercreate2 (hwnd);
++}
++
++HFONT
++l10n_getfont (HFONT f)
++{
++  LOGFONT l;
++
++  if (getEnabled() && GetObject ((HGDIOBJ)f, sizeof (l), &l))
++    {
++      if (!stricmp (l.lfFaceName, ofontname))
++	return hfont;
++    }
++  return f;
++}
++
++int xsprintf(char* buffer, const char* format, ...)
++{
++  int r;
++  char format2[1024];
++  va_list args;
++  va_start(args, format);
++  if (getEnabled())
++    {
++      if (getl10nstr((char*) format, "", format2, 1024))
++        format = format2;
++    }
++  r = vsprintf(buffer, format, args);
++  va_end(args);
++  return r;
++}
++
++#ifdef _WINDOWS
++#undef _vsnprintf
++#define vsnprintf _vsnprintf
++#else
++#undef vsnprintf
++#endif
++int xvsnprintf(char* buffer, int size, const char* format, va_list args)
++{
++  char format2[1024];
++  if (getEnabled())
++    {
++      if (getl10nstr((char*) format, "", format2, 1024))
++        format = format2;
++    }
++  return vsnprintf(buffer, size, format, args);
++}
++
++static int getOpenSaveFilename(OPENFILENAME* ofn, int (WINAPI *f)(OPENFILENAME*)) {
++  char buft[256];
++  char bufft[256];
++  char buff[256];
++  if (getEnabled())
++    {
++      if (ofn->lpstrTitle != NULL)
++        {
++          if (getl10nstr((char*) ofn->lpstrTitle, "", buft, 256))
++            ofn->lpstrTitle = buft;
++        }
++      if (ofn->lpstrFileTitle != NULL)
++        {
++          if (getl10nstr((char*) ofn->lpstrFileTitle, "", bufft, 256))
++            ofn->lpstrFileTitle = bufft;
++        }
++      if (ofn->lpstrFilter != NULL)
++        {
++          if (getl10nstr((char*) ofn->lpstrFilter, "", buff, 256))
++            ofn->lpstrFilter = buff;
++        }
++    }
++  return f(ofn);
++}
++
++#undef GetOpenFileNameA
++int xGetOpenFileNameA(OPENFILENAMEA* ofn)
++{
++  return getOpenSaveFilename(ofn, GetOpenFileNameA);
++}
++
++#undef GetSaveFileNameA
++int xGetSaveFileNameA(OPENFILENAMEA* ofn)
++{
++  return getOpenSaveFilename(ofn, GetSaveFileNameA);
++}
++
++BOOL l10nSetDlgItemText(HWND dialog, int id, LPCSTR text) {
++	char buf[256];
++	if (getl10nstr((char*) text, "", buf, 256))
++		text = buf;
++	return SetDlgItemText(dialog, id, text);
++}
++
++BOOL l10nAppendMenu(HMENU menu, UINT flags, UINT id, LPCSTR text) {
++	char buf[256];
++	if (getl10nstr((char*) text, "", buf, 256))
++		text = buf;
++	return AppendMenu(menu, flags, id, text);
++}
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winl10ndummy.c
+--- /dev/null	Thu Jan 01 00:00:00 1970 +0000
++++ b/windows/winl10ndummy.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -0,0 +1,32 @@
++#include <stdio.h>
++#include <stdarg.h>
++
++int get_l10n_setting(const char* keyname, char* buf, int size)
++{
++    return 0;
++}
++
++int xsprintf(char* buffer, const char* format, ...)
++{
++    int r;
++    va_list args;
++    va_start(args, format);
++    r = vsprintf(buffer, format, args);
++    va_end(args);
++    return r;
++}
++
++#ifdef _WINDOWS
++#undef _vsnprintf
++#define vsnprintf _vsnprintf
++#else
++#undef vsnprintf
++#endif
++int xvsnprintf(char* buffer, int size, const char* format, va_list args)
++{
++  return vsnprintf(buffer, size, format, args);
++}
++
++char *l10n_dupstr (char *s) {
++  return dupstr(s);
++}
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winmisc.c
+--- a/windows/winmisc.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winmisc.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -132,6 +132,11 @@
      return ret;
  }
@@ -28026,10 +29083,16 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winmisc.c
  #ifdef DEBUG
  static FILE *debug_fp = NULL;
  static HANDLE debug_hdl = INVALID_HANDLE_VALUE;
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winpgen.c
---- a/windows/winpgen.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winpgen.c	Thu Dec 29 18:25:25 2011 +0900
-@@ -24,6 +24,12 @@
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winpgen.c
+--- a/windows/winpgen.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winpgen.c	Mon Jan 30 23:51:03 2012 +0900
+@@ -19,11 +19,17 @@
+ 
+ #define WM_DONEKEY (WM_APP + 1)
+ 
+-#define DEFAULT_KEYSIZE 1024
++#define DEFAULT_KEYSIZE 2048
+ 
  static char *cmdline_keyfile = NULL;
  
  /*
@@ -28180,9 +29243,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winpgen.c
  }
  
  void cleanup_exit(int code)
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winpgnt.c
---- a/windows/winpgnt.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winpgnt.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winpgnt.c
+--- a/windows/winpgnt.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winpgnt.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -7,6 +7,7 @@
  #include <ctype.h>
  #include <assert.h>
@@ -29227,9 +30290,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winpgnt.c
      initial_menuitems_count = GetMenuItemCount(session_menu);
  
      /* Set the default menu item. */
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winplink.c
---- a/windows/winplink.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winplink.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winplink.c
+--- a/windows/winplink.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winplink.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -273,6 +273,9 @@
      }
  }
@@ -29262,9 +30325,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winplink.c
      while (--argc) {
  	char *p = *++argv;
  	if (*p == '-') {
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winplinkw.c
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winplinkw.c
 --- /dev/null	Thu Jan 01 00:00:00 1970 +0000
-+++ b/windows/winplinkw.c	Thu Dec 29 18:25:25 2011 +0900
++++ b/windows/winplinkw.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -0,0 +1,1537 @@
 +/*
 + * PLinkw - a Windows command-line (stdin/stdout) variant of PuTTY.
@@ -30803,9 +31866,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winplinkw.c
 +    set_valid_handle(STD_ERROR_HANDLE,  prepare_pipe);
 +    WinMainCRTStartup();
 +}
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winsftp.c
---- a/windows/winsftp.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winsftp.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winsftp.c
+--- a/windows/winsftp.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winsftp.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -708,6 +708,9 @@
      return ctx->line;
  }
@@ -30838,9 +31901,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winsftp.c
      ret = psftp_main(argc, argv);
  
      return ret;
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winstore.c
---- a/windows/winstore.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winstore.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winstore.c
+--- a/windows/winstore.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winstore.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -8,6 +8,7 @@
  #include <limits.h>
  #include "putty.h"
@@ -31329,9 +32392,9 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winstore.c
      /*
       * Open the main PuTTY registry key and remove everything in it.
       */
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winstuff.h
---- a/windows/winstuff.h	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winstuff.h	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winstuff.h
+--- a/windows/winstuff.h	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winstuff.h	Mon Jan 30 23:51:03 2012 +0900
 @@ -194,7 +194,8 @@
  GLOBAL Terminal *term;
  GLOBAL void *logctx;
@@ -31354,10 +32417,19 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winstuff.h
  
  /*
   * On some versions of Windows, it has been known for WM_TIMER to
-@@ -552,4 +558,31 @@
+@@ -552,4 +558,42 @@
   * empty one. */
  char *get_jumplist_registry_entries(void);
  
++/*
++ * Exports from iso2022.c
++ */
++int xMultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);
++int xWideCharToMultiByte(UINT, DWORD, LPCWSTR, int, LPSTR, int,
++                         LPCSTR, LPBOOL);
++#define MultiByteToWideChar xMultiByteToWideChar
++#define WideCharToMultiByte xWideCharToMultiByte
++
 +/*
 + * Exports from l10n.c
 + */
@@ -31370,6 +32442,10 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winstuff.h
 +#define CreateWindowExA xCreateWindowExA
 +#define DialogBoxParamA xDialogBoxParamA
 +#define CreateDialogParamA xCreateDialogParamA
++void l10n (HINSTANCE);
++HFONT l10n_getfont (HFONT);
++void l10n_created_window (HWND);
++
 +int xsprintf(char*,const char*, ...);
 +int xvsnprintf(char*,int,const char*, va_list args);
 +int xGetOpenFileNameA(OPENFILENAMEA* ofn);
@@ -31382,13 +32458,11 @@ diff -r a5f2d327e10f -r 69d8bf45f3db windows/winstuff.h
 +#endif//_WINDOWS
 +#define GetOpenFileNameA xGetOpenFileNameA
 +#define GetSaveFileNameA xGetSaveFileNameA
-+HFONT l10n_getfont (HFONT);
-+void l10n_created_window (HWND);
 +
  #endif
-diff -r a5f2d327e10f -r 69d8bf45f3db windows/winucs.c
---- a/windows/winucs.c	Thu Dec 29 18:30:44 2011 +0900
-+++ b/windows/winucs.c	Thu Dec 29 18:25:25 2011 +0900
+diff -r b9dfa96f2b06 -r 6555bf286954 windows/winucs.c
+--- a/windows/winucs.c	Thu Jan 12 20:53:35 2012 +0900
++++ b/windows/winucs.c	Mon Jan 30 23:51:03 2012 +0900
 @@ -390,6 +390,23 @@
  };
  

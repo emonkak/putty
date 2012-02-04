@@ -559,6 +559,15 @@ int remove_from_jumplist_registry(const char *item);
 char *get_jumplist_registry_entries(void);
 
 /*
+ * Exports from iso2022.c
+ */
+int xMultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);
+int xWideCharToMultiByte(UINT, DWORD, LPCWSTR, int, LPSTR, int,
+                         LPCSTR, LPBOOL);
+#define MultiByteToWideChar xMultiByteToWideChar
+#define WideCharToMultiByte xWideCharToMultiByte
+
+/*
  * Exports from l10n.c
  */
 int xMessageBoxA(HWND, LPCSTR, LPCSTR, UINT);
@@ -570,6 +579,10 @@ HWND xCreateDialogParamA(HINSTANCE, LPCSTR, HWND, DLGPROC, LPARAM);
 #define CreateWindowExA xCreateWindowExA
 #define DialogBoxParamA xDialogBoxParamA
 #define CreateDialogParamA xCreateDialogParamA
+void l10n (HINSTANCE);
+HFONT l10n_getfont (HFONT);
+void l10n_created_window (HWND);
+
 int xsprintf(char*,const char*, ...);
 int xvsnprintf(char*,int,const char*, va_list args);
 int xGetOpenFileNameA(OPENFILENAMEA* ofn);
@@ -582,7 +595,5 @@ int xGetSaveFileNameA(OPENFILENAMEA* ofn);
 #endif//_WINDOWS
 #define GetOpenFileNameA xGetOpenFileNameA
 #define GetSaveFileNameA xGetSaveFileNameA
-HFONT l10n_getfont (HFONT);
-void l10n_created_window (HWND);
 
 #endif

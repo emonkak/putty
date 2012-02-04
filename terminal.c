@@ -1226,7 +1226,9 @@ static void term_schedule_vbell(Terminal *term, int already_started,
  */
 static void power_on(Terminal *term, int clear)
 {
-    if (in_utf (term)) term->ucsdata->iso2022 = !iso2022_init (&term->ucsdata->iso2022_data, term->cfg.line_codepage, 0);
+    if (in_utf (term))
+	term->ucsdata->iso2022 = !iso2022_init (&term->ucsdata->iso2022_data,
+						term->cfg.line_codepage, 0);
     term->alt_x = term->alt_y = 0;
     term->savecurs.x = term->savecurs.y = 0;
     term->alt_savecurs.x = term->alt_savecurs.y = 0;
@@ -1538,6 +1540,8 @@ Terminal *term_init(Config *mycfg, struct unicode_data *ucsdata,
 
     term->bidi_cache_size = 0;
     term->pre_bidi_cache = term->post_bidi_cache = NULL;
+
+    term->bracketed_paste = 0;
 
     /* FULL-TERMCHAR */
     term->basic_erase_char.chr = CSET_ASCII | ' ';
@@ -2473,6 +2477,9 @@ static void toggle_mode(Terminal *term, int mode, int query, int state)
 		save_cursor(term, state);
 	    term->disptop = 0;
 	    break;
+	  case 2004:		       /* xterm bracketed paste */
+	    term->bracketed_paste = state ? 1 : 0;
+	    break;
     } else
 	switch (mode) {
 	  case 4:		       /* IRM: set insert mode */
@@ -2579,27 +2586,27 @@ static void term_out(Terminal *term)
     int unget;
     unsigned char localbuf[256], *chars;
     int nchars = 0;
-    int iso2022;
-    struct iso2022_data *iso2022_data_p;
+    struct iso2022_data *iso2022 = NULL;
 
     unget = -1;
 
-    iso2022 = in_utf (term) && term->ucsdata->iso2022;
-    if (iso2022) iso2022_data_p = &term->ucsdata->iso2022_data;
+    if (in_utf (term) && term->ucsdata->iso2022)
+	iso2022 = &term->ucsdata->iso2022_data;
     chars = NULL;		       /* placate compiler warnings */
-    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0 || (iso2022 && iso2022_buflen (iso2022_data_p) > 0)) {
+    while (nchars > 0 || unget != -1 || bufchain_size(&term->inbuf) > 0 ||
+	   (iso2022 && iso2022_buflen (iso2022) > 0)) {
 	if (unget == -1) {
-	    if (iso2022 && term->termstate == TOPLEVEL) iso2022_clearesc (iso2022_data_p);
-	    if (!iso2022 || !iso2022_buflen (iso2022_data_p)) {
+	    if (iso2022 && term->termstate == TOPLEVEL)
+		iso2022_clearesc (iso2022);
+	    if (!iso2022 || !iso2022_buflen (iso2022)) {
 	    if (nchars == 0) {
 		void *ret;
 		bufchain_prefix(&term->inbuf, &ret, &nchars);
 		if (nchars > sizeof(localbuf))
 		    nchars = sizeof(localbuf);
 		memcpy(localbuf, ret, nchars);
-		if (iso2022) {
-		     iso2022_autodetect_put (iso2022_data_p, localbuf, nchars);
-		}
+		if (iso2022)
+		    iso2022_autodetect_put (iso2022, localbuf, nchars);
 		bufchain_consume(&term->inbuf, nchars);
 		chars = localbuf;
 		assert(chars != NULL);
@@ -2613,11 +2620,13 @@ static void term_out(Terminal *term)
 	     */
 	    if (term->cfg.logtype == LGTYP_DEBUG && term->logctx)
 		logtraffic(term->logctx, (unsigned char) c, LGTYP_DEBUG);
-	    if (iso2022) iso2022_put (iso2022_data_p, c);
+	    if (iso2022) iso2022_put (iso2022, c);
 	    }
 	    if (iso2022) {
-		if (iso2022_buflen (iso2022_data_p) > 0) c = iso2022_getbuf (iso2022_data_p);
-		else continue;
+		if (iso2022_buflen (iso2022) > 0)
+		    c = iso2022_getbuf (iso2022);
+		else
+		    continue;
 	    }
 	} else {
 	    c = unget;
@@ -3009,14 +3018,34 @@ static void term_out(Terminal *term)
 		{
 		    termline *cline = scrlineptr(term->curs.y);
 		    int width = 0;
-		    if (!iso2022) {
 		    if (DIRECT_CHAR(c))
 			width = 1;
-		    if (!width)
+		    if (iso2022)
+			width = iso2022_width (iso2022, (wchar_t)c);
+		    if (!width || c >= 0x10000) {
 			width = (term->cfg.cjk_ambig_wide ?
 				 mk_wcwidth_cjk((wchar_t) c) :
 				 mk_wcwidth((wchar_t) c));
-		    } else width = iso2022_width (iso2022_data_p, (wchar_t) c);
+			/* yoshidam: wchar_t loses Unicode value */
+			if ((c >= 0x20000 && c <= 0x2FFFD) ||   /* SIP */
+			    (c >= 0x30000 && c <= 0x3FFFD) ||   /* TIP */
+			    (c >= 0x1F200 && c <= 0x1F2DD) ||   /* ENCLOSED IDEOGRAPHIC SUPPL. */
+			    (c >= 0x1B000 && c <= 0x1B0FF))     /* KANA SUPPL. */
+			    width = 2;
+			else if ((c >= 0xE0100 && c <= 0xE01EF))  /* VARIATION SELECTOR */
+			    width = 0;
+			else if ((c >= 0x10000 && c <= 0x1FFFD) || /* SMP */
+				 (c >= 0xE0000 && c <= 0xEFFFD) || /* SSP */
+				 (c >= 0xF0000 && c <= 0xFFFFD) || /* PRIVATE */
+				 (c >= 0x100000 && c <= 0x10FFFD)) /* PRIVATE */
+			    width = 1;
+
+			if (term->cfg.cjk_ambig_wide &&
+			    ((c >= 0x1F100 && c <= 0x1F19A) ||  /* ENCLOSED ALPHANUMERIC SUPPL. */
+			     (c >= 0xF0000 && c <= 0xFFFFD) ||  /* PRIVATE */
+			     (c >= 0x100000 && c <= 0x10FFFD))) /* PRIVATE */
+			    width++;
+		    }
 
 		    if (term->wrapnext && term->wrap && width > 0) {
 			cline->lattr |= LATTR_WRAPPED;
@@ -4706,7 +4735,7 @@ static termchar *term_bidi_line(Terminal *term, struct termline *ldata,
 		}
 
 		term->wcFrom[it].origwc = term->wcFrom[it].wc =
-		    (wchar_t)uc;
+		    uc; /* yoshidam: wchar_t loses Unicode value  */
 		term->wcFrom[it].index = it;
 	    }
 
@@ -5212,10 +5241,16 @@ static void do_paint(Terminal *term, Context ctx, int may_optimise)
 		dirty_run = TRUE;
 	    }
 
-	    if (ccount >= chlen) {
+	    if (ccount+1 >= chlen) { /* yoshidam */
 		chlen = ccount + 256;
 		ch = sresize(ch, chlen, wchar_t);
 	    }
+	    /* yoshidam: decompose Unicode value into SURROGATE PAIR */
+	    if (tchar > 0x10000 && tchar < 0x110000) {
+		ch[ccount++] = (wchar_t) (0xD800 | ((tchar - 0x10000) >> 10));
+		ch[ccount++] = (wchar_t) (0xDC00 | ((tchar - 0x10000) & 0x3FF));
+	    }
+	    else
 	    ch[ccount++] = (wchar_t) tchar;
 
 	    if (d->cc_next) {
@@ -5239,10 +5274,16 @@ static void do_paint(Terminal *term, Context ctx, int may_optimise)
 			break;
 		    }
 
-		    if (ccount >= chlen) {
+		    if (ccount+1 >= chlen) { /* yoshidam */
 			chlen = ccount + 256;
 			ch = sresize(ch, chlen, wchar_t);
 		    }
+		    /* yoshidam: decompose Unicode value into SURROGATE PAIR */
+		    if (schar > 0x10000 && schar < 0x110000) {
+			ch[ccount++] = (wchar_t) (0xD800 | ((schar - 0x10000) >> 10));
+			ch[ccount++] = (wchar_t) (0xDC00 | ((schar - 0x10000) & 0x3FF));
+		    }
+		    else
 		    ch[ccount++] = (wchar_t) schar;
 		}
 
@@ -5836,7 +5877,12 @@ void term_do_paste(Terminal *term)
         if (term->paste_buffer)
             sfree(term->paste_buffer);
         term->paste_pos = term->paste_hold = term->paste_len = 0;
-        term->paste_buffer = snewn(len, wchar_t);
+        term->paste_buffer = snewn(len + 12, wchar_t);
+
+        if (term->bracketed_paste) {
+            memcpy(term->paste_buffer, L"\033[200~", 6 * sizeof(wchar_t));
+            term->paste_len += 6;
+        }
 
         p = q = data;
         while (p < data + len) {
@@ -5858,6 +5904,11 @@ void term_do_paste(Terminal *term)
                 p += sel_nl_sz;
             }
             q = p;
+        }
+
+        if (term->bracketed_paste) {
+            memcpy(&term->paste_buffer[term->paste_len], L"\033[201~", 6 * sizeof(wchar_t));
+            term->paste_len += 6;
         }
 
         /* Assume a small paste will be OK in one go. */

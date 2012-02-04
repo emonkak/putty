@@ -432,12 +432,6 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "ApplicationCursorKeys", cfg->app_cursor);
     write_setting_i(sesskey, "ApplicationKeypad", cfg->app_keypad);
     write_setting_i(sesskey, "NetHackKeypad", cfg->nethack_keypad);
-    /*
-     * HACK: PuttyTray / Reconnect
-     */
-    write_setting_i(sesskey, "WakeupReconnect", cfg->wakeup_reconnect);
-    write_setting_i(sesskey, "FailureReconnect", cfg->failure_reconnect);
-
     write_setting_i(sesskey, "AltF4", cfg->alt_f4);
     write_setting_i(sesskey, "AltSpace", cfg->alt_space);
     write_setting_i(sesskey, "AltOnly", cfg->alt_only);
@@ -559,13 +553,6 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_fontspec(sesskey, "WideBoldFont", cfg->wideboldfont);
     write_setting_i(sesskey, "ShadowBold", cfg->shadowbold);
     write_setting_i(sesskey, "ShadowBoldOffset", cfg->shadowboldoffset);
-    /* > transparent background patch */
-    write_setting_i( sesskey, "TransparentMode", cfg->transparent_mode );
-    write_setting_i( sesskey, "Shading", cfg->shading );
-    write_setting_i( sesskey, "UseAlphaBlend", cfg->use_alphablend );
-    write_setting_i( sesskey, "StoppedToDraw", cfg->stop_when_moving );
-    write_setting_filename( sesskey, "BackgroundImageFile", cfg->bgimg_file );
-    /* < */
     write_setting_s(sesskey, "SerialLine", cfg->serline);
     write_setting_i(sesskey, "SerialSpeed", cfg->serspeed);
     write_setting_i(sesskey, "SerialDataBits", cfg->serdatabits);
@@ -574,10 +561,31 @@ void save_open_settings(void *sesskey, Config *cfg)
     write_setting_i(sesskey, "SerialFlowControl", cfg->serflow);
     write_setting_s(sesskey, "WindowClass", cfg->winclass);
 
+    /* HACK: PuttyTray / Reconnect */
+    write_setting_i(sesskey, "WakeupReconnect", cfg->wakeup_reconnect);
+    write_setting_i(sesskey, "FailureReconnect", cfg->failure_reconnect);
+
     /* Hyperlink */
     write_setting_i(sesskey, "HyperlinkEnable", cfg->url_enable);
     write_setting_i(sesskey, "HyperlinkUnderline", cfg->url_underline);
     write_setting_i(sesskey, "HyperlinkUseCtrlClick", cfg->url_ctrl_click);
+
+    /* Background */
+    write_setting_i(sesskey, "BackgroundWallpaper", cfg->bg_wallpaper);
+    write_setting_i(sesskey, "BackgroundEffect", cfg->bg_effect);
+    write_setting_filename(sesskey, "WallpaperFile", cfg->wp_file);
+    write_setting_i(sesskey, "WallpaperPosition", cfg->wp_position);
+    write_setting_i(sesskey, "WallpaperAlign", cfg->wp_align);
+    write_setting_i(sesskey, "WallpaperVerticalAlign", cfg->wp_valign);
+    write_setting_i(sesskey, "WallpaperMoving", cfg->wp_moving);
+
+    /* Transparency */
+    for (i = 0; i < 4; i++) {
+	char buf[16], buf2[16];
+	sprintf(buf, "Alpha%d", i);
+	sprintf(buf2, "%d,%d", cfg->alphas_pc[i][0], cfg->alphas_pc[i][1]);
+	write_setting_s(sesskey, buf, buf2);
+    }
 }
 
 void load_settings(char *section, Config * cfg)
@@ -765,12 +773,6 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "ApplicationCursorKeys", 0, &cfg->app_cursor);
     gppi(sesskey, "ApplicationKeypad", 0, &cfg->app_keypad);
     gppi(sesskey, "NetHackKeypad", 0, &cfg->nethack_keypad);
-    /*
-     * HACK: PuttyTray / Reconnect
-     */
-    gppi(sesskey, "WakeupReconnect", 0, &cfg->wakeup_reconnect);
-    gppi(sesskey, "FailureReconnect", 0, &cfg->failure_reconnect);
-
     gppi(sesskey, "AltF4", 1, &cfg->alt_f4);
     gppi(sesskey, "AltSpace", 0, &cfg->alt_space);
     gppi(sesskey, "AltOnly", 0, &cfg->alt_only);
@@ -992,13 +994,6 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppfont(sesskey, "WideFont", &cfg->widefont);
     gppfont(sesskey, "WideBoldFont", &cfg->wideboldfont);
     gppi(sesskey, "ShadowBoldOffset", 1, &cfg->shadowboldoffset);
-    /* > transparent background patch */
-    gppi( sesskey, "TransparentMode", 0, &cfg->transparent_mode );
-    gppi( sesskey, "Shading", 0, &cfg->shading );
-    gppi( sesskey, "UseAlphaBlend", 0, &cfg->use_alphablend );
-    gppi( sesskey, "StoppedToDraw", 0, &cfg->stop_when_moving );
-    gppfile( sesskey, "BackgroundImageFile", &cfg->bgimg_file );
-    /* < */
     gpps(sesskey, "SerialLine", "", cfg->serline, sizeof(cfg->serline));
     gppi(sesskey, "SerialSpeed", 9600, &cfg->serspeed);
     gppi(sesskey, "SerialDataBits", 8, &cfg->serdatabits);
@@ -1007,10 +1002,45 @@ void load_open_settings(void *sesskey, Config *cfg)
     gppi(sesskey, "SerialFlowControl", SER_FLOW_XONXOFF, &cfg->serflow);
     gpps(sesskey, "WindowClass", "", cfg->winclass, sizeof(cfg->winclass));
 
+    /* HACK: PuttyTray / Reconnect */
+    gppi(sesskey, "WakeupReconnect", 0, &cfg->wakeup_reconnect);
+    gppi(sesskey, "FailureReconnect", 0, &cfg->failure_reconnect);
+
     /* Hyperlink */
     gppi(sesskey, "HyperlinkEnable", 1, &cfg->url_enable);
     gppi(sesskey, "HyperlinkUnderline", 1, &cfg->url_underline);
     gppi(sesskey, "HyperlinkUseCtrlClick", 1, &cfg->url_ctrl_click);
+
+    /* Background */
+    gppi(sesskey, "BackgroundWallpaper", 0, &cfg->bg_wallpaper);
+    gppi(sesskey, "BackgroundEffect", 0, &cfg->bg_effect);
+    gppfile(sesskey, "WallpaperFile", &cfg->wp_file);
+    gppi(sesskey, "WallpaperPosition", 0, &cfg->wp_position);
+    gppi(sesskey, "WallpaperAlign", 0, &cfg->wp_align);
+    gppi(sesskey, "WallpaperVerticalAlign", 0, &cfg->wp_valign);
+    gppi(sesskey, "WallpaperMoving", 0, &cfg->wp_moving);
+
+    /* Transparency */
+    for (i = 0; i < 4; i++) {
+	static const char *const defaults[] = {
+	    "100,100", "100,100", "100,100", "100,100"
+	};
+	char buf[16], buf2[16];
+	int c0 = 100;
+	int c1 = 100;
+	sprintf(buf, "Alpha%d", i);
+	gpps(sesskey, buf, defaults[i], buf2, sizeof(buf2));
+	if (sscanf(buf2, "%d,%d", &c0, &c1)) {
+	    if (c0 > 100) {
+		c0 = 100;
+	    }
+	    if (c1 > 100) {
+		c1 = 100;
+	    }
+	    cfg->alphas_pc[i][0] = c0;
+	    cfg->alphas_pc[i][1] = c1;
+	}
+    }
 }
 
 void do_defaults(char *session, Config * cfg)

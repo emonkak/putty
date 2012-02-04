@@ -255,6 +255,7 @@ GUITERM  = TERMINAL window windlg winctrls sizetip winucs winprint
 
 # Same thing on Unix.
 UXTERM   = TERMINAL uxcfg sercfg uxucs uxprint timing
+         + uxl10n
 GTKTERM  = UXTERM gtkwin gtkcfg gtkdlg gtkfont gtkcols xkeysym
 OSXTERM  = UXTERM osxwin osxdlg osxctrls
 
@@ -309,39 +310,40 @@ U_BE_NOSSH = be_nos_s uxser nocproxy
 # X/GTK Unix app, [U] for command-line Unix app.
 
 putty    : [G] GUITERM NONSSH WINSSH W_BE_ALL WINMISC winx11 putty.res LIBS
-         + l10n
+         + winl10n
 puttytel : [G] GUITERM NONSSH W_BE_NOSSH WINMISC puttytel.res nogss LIBS
-         + l10n
+         + winl10n
 plink    : [C] winplink wincons NONSSH WINSSH W_BE_ALL logging WINMISC
          + winx11 plink.res winnojmp LIBS
-         + l10ndummy
+         + winl10ndummy
 plinkw   : [G] winplinkw winconsw NONSSH WINSSH W_BE_ALL logging WINMISC
          + winx11 plinkw.res winnojmp LIBS
-         + l10n
+         + winl10n
 pscp     : [C] pscp winsftp wincons WINSSH BE_SSH SFTP wildcard WINMISC
          + pscp.res winnojmp LIBS
-         + l10ndummy
+         + winl10ndummy
 psftp    : [C] psftp winsftp wincons WINSSH BE_SSH SFTP wildcard WINMISC
          + psftp.res winnojmp LIBS
-         + l10ndummy
+         + winl10ndummy
 
 pageant  : [G] winpgnt sshrsa sshpubk sshdes sshbn sshmd5 version tree234
          + misc sshaes sshsha winpgntc sshdss sshsh256 sshsh512 winutils
          + winmisc winhelp pageant.res LIBS
-         + l10n
+         + winl10n
 
 puttygen : [G] winpgen sshrsag sshdssg sshprime sshdes sshbn sshmd5 version
          + sshrand winnoise sshsha winstore misc winctrls sshrsa sshdss winmisc
          + sshpubk sshaes sshsh256 sshsh512 import winutils puttygen.res
 	 + tree234 notiming winhelp winnojmp LIBS wintime
-	 + l10n iso2022 wcwidth
+	 + winl10n iso2022 wcwidth
 
 pfwd     : [G] pfwd wincons2 NONSSH WINSSH W_BE_ALL logging WINMISC
-         + winx11 pfwd.res winnojmp LIBS l10n
+         + winx11 pfwd.res winnojmp LIBS winl10n
 
 pterm    : [X] GTKTERM uxmisc misc ldisc settings uxpty uxsel BE_NONE uxstore
          + uxsignal CHARSET cmdline uxpterm version time xpmpterm xpmptcfg
 	 + nogss
+         + iso2022
 putty    : [X] GTKTERM uxmisc misc ldisc settings uxsel U_BE_ALL uxstore
          + uxsignal CHARSET uxputty NONSSH UXSSH UXMISC ux_x11 xpmputty
          + xpmpucfg

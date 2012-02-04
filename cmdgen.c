@@ -262,7 +262,7 @@ int main(int argc, char **argv)
     char *outfile = NULL, *outfiletmp = NULL;
     Filename outfilename;
     enum { PRIVATE, PUBLIC, PUBLICO, FP, OPENSSH, SSHCOM } outtype = PRIVATE;
-    int bits = 1024;
+    int bits = 2048;
     char *comment = NULL, *origcomment = NULL;
     int change_passphrase = FALSE;
     int errs = FALSE, nogo = FALSE;

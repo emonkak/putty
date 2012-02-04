@@ -485,6 +485,35 @@ enum {
     URL_UNDERLINE_ALWAYS, URL_UNDERLINE_HOVER, URL_UNDERLINE_NEVER
 };
 
+/* Background */
+typedef enum {
+    ALPHA_FG, ALPHA_BG, ALPHA_DEFAULT_BG, ALPHA_WINDOW
+};
+
+typedef enum {
+    BG_NONE, BG_FILE, BG_FILE_DESKTOP, BG_DESKTOP
+};
+
+typedef enum {
+    BG_PLANE, BG_GLASS, BG_DOUBLE_GLASS
+};
+
+typedef enum {
+    BG_ACTIVE, BG_INACTIVE
+};
+
+enum {
+    WP_FILL, WP_FIT, WP_STRETCH, WP_TILE, WP_FIX
+};
+
+enum {
+    WP_LEFT, WP_CENTER, WP_RIGHT
+};
+
+enum {
+    WP_TOP, WP_MIDDLE, WP_BOTTOM
+};
+
 struct backend_tag {
     const char *(*init) (void *frontend_handle, void **backend_handle,
 			 Config *cfg,
@@ -747,18 +776,10 @@ struct config_tag {
     int shadowboldoffset;
     int crhaslf;
     char winclass[256];
-	/* > transparent background patch */
-	int transparent_mode;
-	int shading;
-	int use_alphablend;
-    int stop_when_moving;
-    Filename bgimg_file;
-	/* < */
+
     Filename iconfile;
  
-    /*
-     * HACK: PuttyTray / Reconnect
-     */
+    /* HACK: PuttyTray / Reconnect */
     int wakeup_reconnect;
     int failure_reconnect;
 
@@ -766,6 +787,16 @@ struct config_tag {
     int url_enable;
     int url_underline;
     int url_ctrl_click;
+
+    /* Background */
+    int alphas_pc[4][2];
+    int bg_wallpaper;
+    int bg_effect;
+    Filename wp_file;
+    int wp_position;
+    int wp_align;
+    int wp_valign;
+    int wp_moving;
 };
 
 /*
@@ -1267,7 +1298,7 @@ void setup_config_box(struct controlbox *b, int midsession,
  * Exports from minibidi.c.
  */
 typedef struct bidi_char {
-    wchar_t origwc, wc;
+    unsigned long origwc, wc; /* yoshidam */
     unsigned short index;
 } bidi_char;
 int do_bidi(bidi_char *line, int count);
@@ -1406,18 +1437,12 @@ void timer_change_notify(long next);
 /*
  * Exports from iso2022.c
  */
-int xMultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int);
-int xWideCharToMultiByte(UINT, DWORD, LPCWSTR, int, LPSTR, int,
-                         LPCSTR, LPBOOL);
-#define MultiByteToWideChar xMultiByteToWideChar
-#define WideCharToMultiByte xWideCharToMultiByte
-
 int iso2022_init (struct iso2022_data *this, char *p, int mode);
 int iso2022_init_test (char *p);
 void iso2022_transmit (struct iso2022_data *this, unsigned char c);
 void iso2022_put (struct iso2022_data *this, unsigned char c);
 void iso2022_clearesc (struct iso2022_data *this);
-int iso2022_width (struct iso2022_data *this, wchar_t);
+int iso2022_width_sub (struct iso2022_data *this, wchar_t);
 unsigned char iso2022_tgetbuf (struct iso2022_data *this);
 unsigned char iso2022_getbuf (struct iso2022_data *this);
 void iso2022_settranschar (struct iso2022_data *this, int value);
@@ -1427,10 +1452,39 @@ int iso2022_buflen (struct iso2022_data *this);
 void iso2022_autodetect_put (struct iso2022_data *this, unsigned char *buf,
 			     int nchars);
 
+static __inline int
+iso2022_width (struct iso2022_data *this, wchar_t c)
+{
+  int width;
+
+  width = iso2022_width_sub (this, c);
+  switch (width)
+    {
+    case -1:
+      return mk_wcwidth_cjk (c);
+    case -2:
+      return mk_wcwidth (c);
+    default:
+      return width;
+    }
+}
+
 /*
- * Exports from l10n.c
+ * Exports from winl10n.c/uxl10n.c
  */
 char *l10n_dupstr (char *);
 int get_l10n_setting(const char* keyname, char* buf, int size);
+
+/* yoshidam */
+#ifndef IS_HIGH_SURROGATE
+#define HIGH_SURROGATE_START 0xd800
+#define HIGH_SURROGATE_END 0xdbff
+#define LOW_SURROGATE_START 0xdc00
+#define LOW_SURROGATE_END 0xdfff
+
+#define IS_HIGH_SURROGATE(wch) (((wch) >= HIGH_SURROGATE_START) && ((wch) <= HIGH_SURROGATE_END))
+#define IS_LOW_SURROGATE(wch) (((wch) >= LOW_SURROGATE_START) && ((wch) <= LOW_SURROGATE_END))
+#define IS_SURROGATE_PAIR(hs, ls) (IS_HIGH_SURROGATE(hs) && IS_LOW_SURROGATE(ls))
+#endif
 
 #endif

@@ -30,11 +30,6 @@
 #include <mmsystem.h>
 #include <dwmapi.h>
 
-/* > transparent background patch */
-#include <wingdi.h>  /* AlphaBlend */
-/* #include <winbase.h> */  /* OutputDebugString */
-/* #define XTRANS_AVOID_UL_BUG */
-/* < */
 
 /* From MSDN: In the WM_SYSCOMMAND message, the four low-order bits of
  * wParam are used by Windows, and should be masked off, so we shouldn't
@@ -158,14 +153,6 @@ struct agent_callback {
     int len;
 };
 
-static void extend_glass_frame(HWND);
-
-/* > transparent background patch */
-static HBITMAP background_bmp = NULL;
-static void xtrans_paint_bg(HDC, int, int, int, int);
-static void (*xtrans_paint_background)(HDC, int, int, int, int) = xtrans_paint_bg;
-/* < */
-
 #define FONT_NORMAL 0
 #define FONT_BOLD 1
 #define FONT_UNDERLINE 2
@@ -217,240 +204,61 @@ static int compose_state = 0;
 
 static UINT wm_mousewheel = WM_MOUSEWHEEL;
 
-static void ExtTextOutW2 (HDC, int, int, UINT, const RECT *, WCHAR *, UINT, const int *, int);
+static void ExtTextOutW2 (int, HDC, int, int, UINT, const RECT *, WCHAR *,
+			  UINT, const int *);
 
-/*
- * HACK: PuttyTray / Reconnect
- */
+static void
+ExtTextOutW2wide (HDC a1, int a2, int a3, UINT a4, const RECT *a5, WCHAR *a6,
+		  UINT a7, const int *a8)
+{
+  ExtTextOutW2 (1, a1, a2, a3, a4, a5, a6, a7, a8);
+}
+
+static void
+ExtTextOutW2narrow (HDC a1, int a2, int a3, UINT a4, const RECT *a5, WCHAR *a6,
+		    UINT a7, const int *a8)
+{
+  ExtTextOutW2 (0, a1, a2, a3, a4, a5, a6, a7, a8);
+}
+
+/* HACK: PuttyTray / Reconnect */
 static time_t last_reconnect = 0;
 
-/* */
+/* Background */
+DECL_WINDOWS_FUNCTION(static, HRESULT, DwmIsCompositionEnabled, (BOOL*));
+DECL_WINDOWS_FUNCTION(static, HRESULT, DwmExtendFrameIntoClientArea, (HWND, MARGINS*));
+DECL_WINDOWS_FUNCTION(static, HRESULT, DwmEnableBlurBehindWindow, (HWND, DWM_BLURBEHIND*));
+DECL_WINDOWS_FUNCTION(static, HRESULT, BufferedPaintSetAlpha, (HPAINTBUFFER, const RECT *, BYTE));
+DECL_WINDOWS_FUNCTION(static, HPAINTBUFFER, BeginBufferedPaint, (HDC, const RECT *, BP_BUFFERFORMAT, BP_PAINTPARAMS *, HDC *));
+DECL_WINDOWS_FUNCTION(static, HRESULT, EndBufferedPaint, (HPAINTBUFFER, BOOL));
 
+static void bg_init();
+static void bg_create();
+static void bg_resize(int draw);
+static void bg_move(int draw);
+static void bg_order();
+static void bg_glass();
+static void bg_trans();
+static LRESULT CALLBACK bg_WndProc(HWND bg_hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+static void bm_create();
+static void wp_create();
+static void wp_draw(HDC hdc, RECT *rc);
+
+static HWND bg_hwnd = NULL;
+static HBRUSH bg_br = NULL;
+static INT bg_active = BG_ACTIVE;
+static HDC bm_dc = NULL;
+static int bm_width;
+static int bm_height;
+static HDC wp_dc = NULL;
+
+/* transparency */
+static BYTE alphas[4][2];
+
+/* IME */
 static int ime_mode = 0;
 static wchar_t ime_w[1024];
 static char ime_m[512];
-
-/* > transparent background patch */
-void xtrans_paint_bg(HDC hdc, int x, int y, int width, int height)
-{
-    HDC memhdc;
-    HBITMAP defbmp;
-
-    memhdc = CreateCompatibleDC(hdc);
-    defbmp = SelectObject(memhdc, background_bmp);
-
-    BitBlt(hdc, x, y, width, height, memhdc, x, y, SRCCOPY);
-
-    SelectObject(memhdc, defbmp);
-    DeleteDC(memhdc);
-}
-
-void xtrans_paint_bg_fwp(HDC hdc, int x, int y, int width, int height)
-{
-    HDC memhdc;
-    HBITMAP defbmp;
-    POINT point;
-
-    point.x = x;
-    point.y = y;
-    ClientToScreen(hwnd, &point);
-
-    memhdc = CreateCompatibleDC(hdc);
-    defbmp = SelectObject(memhdc, background_bmp);
-
-    BitBlt(hdc, x, y, width, height, memhdc, point.x, point.y, SRCCOPY);
-
-    SelectObject(memhdc, defbmp);
-    DeleteDC(memhdc);
-}
-
-void xtrans_free_background()
-{
-    if (background_bmp) {
-        DeleteObject(background_bmp);
-        background_bmp = NULL;
-    }
-}
-
-void xtrans_daub_with_bgcolor(HDC hdc, int width, int height)
-{
-    HPEN pen, defpen;
-    HBRUSH brush, defbrush;
-
-    pen = CreatePen(PS_SOLID, 0, colours[258]);
-    defpen = SelectObject(hdc, pen);
-    brush = CreateSolidBrush(colours[258]);
-    defbrush = SelectObject(hdc, brush);
-
-    Rectangle(hdc, 0, 0, width, height);
-
-    SelectObject(hdc, defpen);
-    DeleteObject(pen);
-    SelectObject(hdc, defbrush);
-    DeleteObject(brush);
-}
-
-void xtrans_set_background()
-{
-    HDC hdc, memhdc;
-    HBITMAP defbmp;
-
-    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 0, 0 };
-
-    RECT rect, up_rect;
-    int width, height;
-
-    if (cfg.transparent_mode == -1) {
-        cfg.transparent_mode = 1;
-        if (background_bmp)
-            xtrans_free_background();
-    }
-
-    bf.SourceConstantAlpha = (BYTE) cfg.shading;
-
-    GetClientRect(hwnd, &rect);
-
-    InvalidateRect(hwnd, NULL, FALSE);
-    GetUpdateRect(hwnd, &up_rect, FALSE);
-    width = up_rect.right - up_rect.left;
-    height = up_rect.bottom - up_rect.top;
-
-    hdc = GetDC(hwnd);
-    memhdc = CreateCompatibleDC(hdc);
-
-    if (background_bmp == NULL)
-        background_bmp = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-
-    defbmp = SelectObject(memhdc, background_bmp);
-
-    xtrans_daub_with_bgcolor(memhdc, rect.right, rect.bottom);
-    PaintDesktop(hdc);
-    AlphaBlend(memhdc, up_rect.left, up_rect.top, width, height,
-               hdc, up_rect.left, up_rect.top, width, height, bf);
-
-    SelectObject(memhdc, defbmp);
-    DeleteDC(memhdc);
-    ReleaseDC(hwnd, hdc);
-}
-
-void xtrans_set_bitmap()
-{
-    if (cfg.bgimg_file.path[0] != '\0') {
-        if (background_bmp)
-            xtrans_free_background();
-        background_bmp = LoadImage(0, cfg.bgimg_file.path,
-                                   IMAGE_BITMAP, 0, 0,
-                                   LR_LOADFROMFILE | LR_DEFAULTSIZE);
-    }
-
-    if (background_bmp == NULL) {
-        cfg.transparent_mode = 0;
-        return;
-    }
-
-    if (cfg.use_alphablend) {
-        HDC hdc, memhdc, memhdc_mask;
-        HBITMAP bmp_mask, defbmp_mask, defbmp;
-        BLENDFUNCTION bf = { AC_SRC_OVER, 0, 0, 0 };
-        int width, height;
-
-        bf.SourceConstantAlpha = (BYTE) cfg.shading;
-
-        hdc = GetDC(hwnd);
-        memhdc = CreateCompatibleDC(hdc);
-        memhdc_mask = CreateCompatibleDC(hdc);
-        defbmp = SelectObject(memhdc, background_bmp);
-        width = GetDeviceCaps(memhdc, HORZRES);
-        height = GetDeviceCaps(memhdc, VERTRES);
-        bmp_mask = CreateCompatibleBitmap(hdc, width, height);
-        ReleaseDC(hwnd, hdc);
-        defbmp_mask = SelectObject(memhdc_mask, bmp_mask);
-
-        xtrans_daub_with_bgcolor(memhdc_mask, width, height);
-        AlphaBlend(memhdc_mask, 0, 0, width, height,
-                   memhdc, 0, 0, width, height, bf);
-
-        SelectObject(memhdc_mask, defbmp_mask);
-        DeleteDC(memhdc_mask);
-        SelectObject(memhdc, defbmp);
-        DeleteDC(memhdc);
-
-        DeleteObject(background_bmp);
-        background_bmp = bmp_mask;
-    }
-}
-
-
-void xtrans_load_bitmap()
-{
-    HANDLE find_handle;
-    WIN32_FIND_DATA find_data;
-
-    char pass[MAX_PATH], shading[4];
-    char *cp;
-    int i;
-
-    if (cfg.transparent_mode == 2 && cfg.bgimg_file.path[0] != '\0')
-        return;
-
-    GetModuleFileName(NULL, pass, MAX_PATH);
-    cp = strrchr(pass, '\\');
-    if (cp == NULL)
-        return;
-    strcpy(++cp, "putty*.bmp");
-
-    find_handle = FindFirstFile(pass, &find_data);
-    if (find_handle == INVALID_HANDLE_VALUE)
-        return;
-    FindClose(find_handle);
-    strcpy(cp, find_data.cFileName);
-
-    /*
-     * putty76.bmp
-     *      ^^ shading value (0 - 255)
-     */
-    if (background_bmp)
-        xtrans_free_background();
-    background_bmp = LoadImage(0, pass, IMAGE_BITMAP, 0, 0,
-                               LR_LOADFROMFILE | LR_DEFAULTSIZE);
-    cfg.transparent_mode = 2;
-
-    cp += 5;
-    for (i = 0; i < 3 && isdigit(*cp); i++, cp++)
-        shading[i] = *cp;
-    shading[i+1] = '\0';
-
-    if (i > 0) {
-        cfg.use_alphablend = 1;
-        cfg.shading = atoi(shading);
-    }
-}
-
-
-void xtrans_init(int reinit)
-{
-    if (reinit)
-        xtrans_load_bitmap();
-
-    if (cfg.shading < 0 || 255 < cfg.shading) {
-        if (cfg.transparent_mode == 1)
-            cfg.transparent_mode = 0;
-        cfg.shading = 0;
-    }
-
-    if ((cfg.transparent_mode & 3) == 0 && background_bmp)
-        xtrans_free_background();
-
-    if (cfg.transparent_mode == 1) {
-        xtrans_set_background();
-        xtrans_paint_background = xtrans_paint_bg;
-    }
-    else if (cfg.transparent_mode == 2) {
-        xtrans_set_bitmap();
-        xtrans_paint_background = xtrans_paint_bg_fwp;
-    }
-}
-/* < */
 
 /* Dummy routine, only required in plink. */
 void ldisc_update(void *frontend, int echo, int edit)
@@ -990,14 +798,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     term_provide_logctx(term, logctx);
     term_size(term, cfg.height, cfg.width, cfg.savelines);
 
-	/* > transparent background patch */
-    /* Avoid Unicode line drawing bug. */
-#ifdef XTRANS_AVOID_UL_BUG
-    if (cfg.vtmode == VT_UNICODE && (cfg.transparent_mode & 3))
-        cfg.vtmode = VT_POORMAN;
-#endif
-	/* < */
-
     /*
      * Initialise the fonts, simultaneously correcting the guesses
      * for font_{width,height}.
@@ -1116,10 +916,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     ShowWindow(hwnd, show);
     SetForegroundWindow(hwnd);
 
-    /* > transparent background patch */
-    xtrans_load_bitmap();
-    /* < */
-
     /*
      * Set the palette up.
      */
@@ -1127,9 +923,9 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     logpal = NULL;
     init_palette();
 
-    /* > transparent background patch */
-    xtrans_init(0);
-    /* < */
+    /* Background */
+    bg_init();
+    bg_create();
 
     term_set_focus(term, GetForegroundWindow() == hwnd);
     UpdateWindow(hwnd);
@@ -1208,10 +1004,6 @@ void cleanup_exit(int code)
 
     /* Clean up COM. */
     CoUninitialize();
-
-	/* > transparent background patch */
-    xtrans_free_background();
-	/* < */
 
     exit(code);
 }
@@ -1622,7 +1414,10 @@ static void exact_textout(HDC hdc, int x, int y, CONST RECT *lprc,
  */
 static void general_textout(HDC hdc, int x, int y, CONST RECT *lprc,
 			    unsigned short *lpString, UINT cbCount,
-			    CONST INT *lpDx, int opaque)
+			    CONST INT *lpDx, int opaque,
+			    void (*ExtTextOutW) (HDC, int, int, UINT,
+						 const RECT *, WCHAR *, UINT,
+						 const int *))
 {
     int i, j, xp, xn;
     int bkmode = 0, got_bkmode = FALSE;
@@ -1696,58 +1491,6 @@ static int get_font_width(HDC hdc, const TEXTMETRIC *tm)
 #undef LAST
     }
     return ret;
-}
-
-static void general_textout2(HDC hdc, int x, int y, CONST RECT *lprc,
-			    unsigned short *lpString, UINT cbCount,
-			    CONST INT *lpDx, int opaque, int wide, int iso2022)
-{
-    int i, j, xp, xn;
-    int bkmode = 0, got_bkmode = FALSE;
-
-    xp = xn = x;
-
-    for (i = 0; i < (int)cbCount ;) {
-	int rtl = is_rtl(lpString[i]);
-
-	xn += lpDx[i];
-
-	for (j = i+1; j < (int)cbCount; j++) {
-	    if (rtl != is_rtl(lpString[j]))
-		break;
-	    xn += lpDx[j];
-	}
-
-	/*
-	 * Now [i,j) indicates a maximal substring of lpString
-	 * which should be displayed using the same textout
-	 * function.
-	 */
-	if (rtl) {
-	    exact_textout(hdc, xp, y, lprc, lpString+i, j-i,
-                          font_varpitch ? NULL : lpDx+i, opaque);
-	} else {
-	  if(!iso2022)
-	    ExtTextOutW(hdc, xp, y, ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
-			lprc, lpString+i, j-i,
-                        font_varpitch ? NULL : lpDx+i);
-	  else
-	    ExtTextOutW2(hdc, xp, y, ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
-			lprc, lpString+i, j-i,
-                         font_varpitch ? NULL : lpDx+i, wide);
-	}
-
-	i = j;
-	xp = xn;
-
-        bkmode = GetBkMode(hdc);
-        got_bkmode = TRUE;
-        SetBkMode(hdc, TRANSPARENT);
-        opaque = FALSE;
-    }
-
-    if (got_bkmode)
-        SetBkMode(hdc, bkmode);
 }
 
 /*
@@ -2049,6 +1792,9 @@ void request_resize(void *frontend, int w, int h)
 	SetWindowPos(hwnd, NULL, 0, 0, width, height,
 	    SWP_NOACTIVATE | SWP_NOCOPYBITS |
 	    SWP_NOMOVE | SWP_NOZORDER);
+
+        /* Background */
+	bg_resize(1);
     } else
 	reset_window(0);
 
@@ -2076,15 +1822,6 @@ static void reset_window(int reinit) {
 
     win_width  = cr.right - cr.left;
     win_height = cr.bottom - cr.top;
-
-	/* > transparent background patch */
-    if (cfg.transparent_mode == 2) {
-        if (cfg.stop_when_moving)
-            InvalidateRect(hwnd, NULL, FALSE);
-    }
-    else if (cfg.transparent_mode & 3)
-        xtrans_set_background();
-	/* < */
 
     if (cfg.resize_action == RESIZE_DISABLED) reinit = 2;
 
@@ -2150,6 +1887,10 @@ static void reset_window(int reinit) {
 #endif
 	    }
 	}
+
+	/* Background */
+	bg_resize(1);
+
 	return;
     }
 
@@ -2177,6 +1918,9 @@ static void reset_window(int reinit) {
 			 font_height*term->rows + extra_height,
 			 SWP_NOMOVE | SWP_NOZORDER);
 	}
+
+	/* Background */
+	bg_resize(1);
 
 	InvalidateRect(hwnd, NULL, TRUE);
 	return;
@@ -2236,6 +1980,9 @@ static void reset_window(int reinit) {
 			 font_height*term->rows + extra_height,
 			 SWP_NOMOVE | SWP_NOZORDER);
 
+	    /* Background */
+	    bg_resize(1);
+
 	    InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
 	    debug((27, "reset_window() -> window resize to (%d,%d)",
@@ -2259,6 +2006,8 @@ static void reset_window(int reinit) {
 
 	extra_width = wr.right - wr.left - cr.right + cr.left +offset_width*2;
 	extra_height = wr.bottom - wr.top - cr.bottom + cr.top+offset_height*2;
+	/* Background */
+	bg_resize(1);
 
 	InvalidateRect(hwnd, NULL, TRUE);
 #ifdef RDB_DEBUG_PATCH
@@ -2440,13 +2189,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	}
 	return 0;
       case WM_DWMCOMPOSITIONCHANGED:
-	if (cfg.transparent_mode == 4) {
-            extend_glass_frame(hwnd);
-	}
+	bg_glass();
+	break;
       case WM_CREATE:
-	if (cfg.transparent_mode == 4) {
-            extend_glass_frame(hwnd);
-	}
         if (cfg.ctrl_tab_switch) {
 	    int wndExtra = GetClassLong(hwnd, GCL_CBWNDEXTRA);
 	    FILETIME filetime;
@@ -2620,15 +2365,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		cfgtopalette();
 		init_palette();
 
-        /* > transparent background patch */
-		xtrans_init(1);
-        /* Avoid Unicode line drawing bug. */
-#ifdef XTRANS_AVOID_UL_BUG
-        if (cfg.vtmode == VT_UNICODE && (cfg.transparent_mode & 3))
-            cfg.vtmode = VT_POORMAN;
-#endif
-        /* < */
-
 		/* Pass new config data to the terminal */
 		term_reconfig(term, &cfg);
 
@@ -2726,6 +2462,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		    cfg.resize_action == RESIZE_EITHER ||
 		    (cfg.resize_action != prev_cfg.resize_action))
 		    init_lvl = 2;
+
+		/* Background */
+		bg_init();
+		bg_create();
 
 		InvalidateRect(hwnd, NULL, TRUE);
 		reset_window(init_lvl);
@@ -3066,13 +2806,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 			offset_width+font_width*term->cols,
 			offset_height+font_height*term->rows);
 
-		/* > transparent background patch */
-		if ((cfg.transparent_mode & 3) > 0)
-            (*xtrans_paint_background)(hdc, p.rcPaint.left, p.rcPaint.top,
-                                       p.rcPaint.right - p.rcPaint.left,
-                                       p.rcPaint.bottom - p.rcPaint.top);
-		else
-		/* < */
 		Rectangle(hdc, p.rcPaint.left, p.rcPaint.top, 
 			  p.rcPaint.right, p.rcPaint.bottom);
 
@@ -3128,6 +2861,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	flash_window(0);	       /* stop */
 	compose_state = 0;
 	term_update(term);
+
+	/* Background */
+	bg_order();
+	bg_active = BG_ACTIVE;
+	bg_trans();
 	break;
       case WM_KILLFOCUS:
 	show_mouseptr(1);
@@ -3135,6 +2873,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	DestroyCaret();
 	caret_x = caret_y = -1;	       /* ensure caret is replaced next time */
 	term_update(term);
+
+	/* Background */
+	bg_order();
+	bg_active = BG_INACTIVE;
+	bg_trans();
 	break;
       case WM_ENTERSIZEMOVE:
 #ifdef RDB_DEBUG_PATCH
@@ -3150,17 +2893,17 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 #ifdef RDB_DEBUG_PATCH
 	debug((27, "WM_EXITSIZEMOVE"));
 #endif
-	/* > transparent background patch */
-	if (cfg.transparent_mode == 2) {
-        if (cfg.stop_when_moving)
-            InvalidateRect(hwnd, NULL, FALSE);
-    }
-    else if (cfg.transparent_mode & 3)
-        xtrans_set_background();
-	/* < */
 	if (need_backend_resize) {
 	    term_size(term, cfg.height, cfg.width, cfg.savelines);
+
+	    /* Background */
+	    bg_resize(1);
+
 	    InvalidateRect(hwnd, NULL, TRUE);
+	}
+	/* Background */
+	else {
+	    bg_move(1);
 	}
 	break;
       case WM_SIZING:
@@ -3219,6 +2962,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		else
 		    r->bottom -= eh;
 	    }
+
+	    /* Background */
+	    bg_resize(0);
+
 	    if (ew || eh)
 		return 1;
 	    else
@@ -3252,6 +2999,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    else
 		r->bottom = r->top + h*term->rows + ex_height;
 
+	    /* Background */
+	    bg_resize(0);
+
 	    return rv;
 	}
 	/* break;  (never reached) */
@@ -3265,11 +3015,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	    cfg.x = rc.left;
 	    cfg.y = rc.top;
 	}
-	/* > transparent background patch */
-	if (cfg.transparent_mode == 2 && (! cfg.stop_when_moving))
-        InvalidateRect(hwnd, NULL, FALSE);
-	/* < */
 	sys_cursor_update();
+
+	/* Background */
+	bg_move(0);
+
 	break;
       case WM_SIZE:
 #ifdef RDB_DEBUG_PATCH
@@ -3281,12 +3031,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		"...",
 	    LOWORD(lParam), HIWORD(lParam)));
 #endif
-	/* > transparent background patch */
-	if(cfg.transparent_mode == 1)
-        cfg.transparent_mode = -1;
-	else if (cfg.transparent_mode == 2)
-        InvalidateRect(hwnd, NULL, FALSE);
-	/* < */
 	if (wParam == SIZE_MINIMIZED)
 	    SetWindowText(hwnd,
 			  cfg.win_name_always ? window_name : icon_name);
@@ -3384,6 +3128,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
                 }
             } else {
                 reset_window(0);
+
+		/* Background */
+		//need_backend_resize = TRUE;
+		bg_resize(0);
 	    }
 	}
 	sys_cursor_update();
@@ -3562,9 +3310,19 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 		 * instead we luni_send the characters one by one.
 		 */
 		term_seen_key_event(term);
+		if (ldisc) {
 		for (i = 0; i < n; i += 2) {
-		    if (ldisc)
+			WCHAR hs = *(unsigned short *)(buff+i);
+			if (IS_HIGH_SURROGATE(hs) && i+2 < n) {
+			    WCHAR ls = *(unsigned short *)(buff+i+2);
+			    if (IS_LOW_SURROGATE(ls)) {
+				luni_send(ldisc, (unsigned short *)(buff+i), 2, 1);
+				i += 2;
+				continue;
+			    }
+			}
 			luni_send(ldisc, (unsigned short *)(buff+i), 1, 1);
+		}
 		}
 		free(buff);
 	    }
@@ -3624,9 +3382,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT message,
 	if (process_clipdata((HGLOBAL)lParam, wParam))
 	    term_do_paste(term);
 	return 0;
-  /*
-   * HACK: PuttyTray / Reconnect
-   */
+      /* HACK: PuttyTray / Reconnect */
       case WM_POWERBROADCAST:
 	if(cfg.wakeup_reconnect) {
 	  switch(wParam) {
@@ -3842,6 +3598,7 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     static int *lpDx = NULL;
     static int lpDx_len = 0;
     int *lpDx_maybe;
+    int len2; /* yoshidam */
 
     /* Hyperlink */
     {
@@ -3937,7 +3694,8 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     }
 
     /* Anything left as an original character set is unprintable. */
-    if (DIRECT_CHAR(text[0])) {
+    if (DIRECT_CHAR(text[0]) &&
+	    (len < 2 || !(IS_HIGH_SURROGATE(text[0]) && IS_LOW_SURROGATE(text[1])))) { /* yoshidam */
 	int i;
 	for (i = 0; i < len; i++)
 	    text[i] = 0xFFFD;
@@ -3982,24 +3740,40 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
     SelectObject(hdc, fonts[nfont]);
     SetTextColor(hdc, fg);
     SetBkColor(hdc, bg);
-	/* > transparent background patch */
-	if ((cfg.transparent_mode & 3) && (nbg == 258)) {
-        SetBkMode(hdc, TRANSPARENT);
-        (*xtrans_paint_background)(hdc, x, y, char_width * len, font_height);
-	}
-    else {
-	/* < */
     if (attr & TATTR_COMBINING)
 	SetBkMode(hdc, TRANSPARENT);
     else
 	SetBkMode(hdc, OPAQUE);
-	/* > transparent background patch */
-    }
-	/* < */
     line_box.left = x;
     line_box.top = y;
     line_box.right = x + char_width * len;
     line_box.bottom = y + font_height;
+
+    /* yoshidam: adjust clipping box */
+    {
+	int i;
+	int rc_width = 0;
+	for (i = 0; i < len ; i++) {
+	    if (text[i] == 0xDB40 &&
+		     i+1 < len &&
+                     (text[i+1] >= 0xDD00 && text[i+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
+		i++;
+	    }
+	    else if (IS_HIGH_SURROGATE(text[i]) &&
+	       i+1 < len &&
+               IS_LOW_SURROGATE(text[i+1])) {
+		rc_width += char_width;
+		i++;
+	    }
+	    else if ((text[i] >= 0x180B && text[i] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
+		     (text[i] >= 0xFE00 && text[i] <= 0xFE0F))    /* VARIATION SELECTOR 1-16 */
+		;
+	    else
+		rc_width += char_width;
+	}
+	if (rc_width < line_box.right - line_box.left)
+	    line_box.right = line_box.left + rc_width;
+    }
 
     /* Only want the left half of double width lines */
     if (line_box.right > font_width*term->cols+offset_width)
@@ -4028,15 +3802,24 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
         maxlen = len;
     }
 
-    /* > transparent background patch */
-    if (cfg.transparent_mode & 3)
-    opaque = FALSE;
-    else
-    opaque = TRUE;                     /* start by erasing the rectangle */
-    /* < */
     for (remaining = len; remaining > 0;
-         text += len, remaining -= len, x += char_width * len) {
+        text += len, remaining -= len, x += char_width * len2) {
         len = (maxlen < remaining ? maxlen : remaining);
+        len2 = len;
+      if (maxlen == 1) {
+          if (remaining >= 1 &&
+              IS_HIGH_SURROGATE(text[0]) &&
+              IS_LOW_SURROGATE(text[1]))
+              len++;
+          if (remaining-len >= 1 &&
+              ((text[len] >= 0x180B && text[len] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
+               (text[len] >= 0xFE00 && text[len] <= 0xFE0F)))    /* VARIATION SELECTOR 1-16 */
+              len++;
+          else if (remaining-len >= 2 &&
+                   text[len] == 0xDB40 &&
+                   (text[len+1] >= 0xDD00 && text[len+1] <= 0xDDEF)) /* VARIATION SELECTOR 17-256 */
+              len += 2;
+      }
 
         if (len > lpDx_len) {
             if (len > lpDx_len) {
@@ -4046,8 +3829,30 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
         }
         {
             int i;
-            for (i = 0; i < len; i++)
+            /* yoshidam: HIGH SURROGATE and VARIATION SELECTOR char has no width */
+            for (i = 0; i < len; i++) {
                 lpDx[i] = char_width;
+	        if (text[i] == 0xDB40 &&
+		         i+1 < len &&
+                         (text[i+1] >= 0xDD00 && text[i+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
+		    if (i > 0) lpDx[i-1] = 0;
+		    lpDx[i] = 0;
+		    i++;
+                lpDx[i] = char_width;
+        }
+                else if (IS_HIGH_SURROGATE(text[i]) &&
+                    i+1 < len &&
+                    IS_LOW_SURROGATE(text[i+1])) {
+                    lpDx[i] = 0;
+                    i++;
+                    lpDx[i] = char_width;
+                }
+	        else if ((text[i] >= 0x180B && text[i] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
+                         (text[i] >= 0xFE00 && text[i] <= 0xFE0F)) {  /* VARIATION SELECTOR 1-16 */
+		    if (i > 0) lpDx[i-1] = 0;
+		    lpDx[i] = char_width;
+                }
+            }
         }
 
         /* We're using a private area for direct to font. (512 chars.) */
@@ -4087,19 +3892,17 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
             if (nlen <= 0)
                 return;		       /* Eeek! */
 
-            ExtTextOutW2(hdc, x + xoffset,
+            ExtTextOutW2(!!(attr & ATTR_WIDE), hdc, x + xoffset,
                         y - font_height * (lattr == LATTR_BOT) + text_adjust,
                         ETO_CLIPPED | (opaque ? ETO_OPAQUE : 0),
                         &line_box, uni_buf, nlen,
-                        lpDx_maybe,
-                        !!(attr & ATTR_WIDE));
+                         lpDx_maybe);
             if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                 SetBkMode(hdc, TRANSPARENT);
-                ExtTextOutW2(hdc, x + xoffset - 1,
+                ExtTextOutW2(!!(attr & ATTR_WIDE), hdc, x + xoffset - 1,
                             y - font_height * (lattr ==
                                                LATTR_BOT) + text_adjust,
-                            ETO_CLIPPED, &line_box, uni_buf, nlen, lpDx_maybe,
-                            !!(attr & ATTR_WIDE));
+                             ETO_CLIPPED, &line_box, uni_buf, nlen, lpDx_maybe);
             }
 
             lpDx[0] = -1;
@@ -4152,21 +3955,20 @@ void do_text_internal(Context ctx, int x, int y, wchar_t *text, int len,
                 wbuf[i] = text[i];
 
             /* print Glyphs as they are, without Windows' Shaping*/
-            general_textout2(hdc, x + xoffset,
+            general_textout(hdc, x + xoffset,
                             y - font_height * (lattr==LATTR_BOT) + text_adjust,
                             &line_box, wbuf, len, lpDx,
-                             opaque && !(attr & TATTR_COMBINING),
-                            !!(attr & ATTR_WIDE),
-                            in_utf (term) && term->ucsdata->iso2022);
+                            opaque && !(attr & TATTR_COMBINING),
+                            (attr & ATTR_WIDE) ? ExtTextOutW2wide
+                            : ExtTextOutW2narrow);
 
             /* And the shadow bold hack. */
             if (bold_mode == BOLD_SHADOW && (attr & ATTR_BOLD)) {
                 SetBkMode(hdc, TRANSPARENT);
-                ExtTextOutW2(hdc, x + xoffset - 1,
+                ExtTextOutW2(!!(attr & ATTR_WIDE), hdc, x + xoffset - 1,
                             y - font_height * (lattr ==
                                                LATTR_BOT) + text_adjust,
-                            ETO_CLIPPED, &line_box, wbuf, len, lpDx_maybe,
-                            !!(attr & ATTR_WIDE));
+                            ETO_CLIPPED, &line_box, wbuf, len, lpDx_maybe);
             }
         }
 
@@ -4201,6 +4003,29 @@ void do_text(Context ctx, int x, int y, wchar_t *text, int len,
 {
     if (attr & TATTR_COMBINING) {
 	unsigned long long a = 0;
+	int len0 = 1;
+	/* yoshidam: don't divide BASE char and VARIATION SELECTOR char */
+	if (len >= 2 &&
+	    IS_HIGH_SURROGATE(text[0]) && IS_LOW_SURROGATE(text[1]))
+	    len0 = 2;
+	if (len-len0 >= 1 &&
+	    ((text[len0] >= 0x180B && text[len0] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
+	    (text[len0] >= 0xFE00 && text[len0] <= 0xFE0F))) { /* VARIATION SELECTOR 1-16 */
+	    attr &= ~TATTR_COMBINING;
+	    do_text_internal(ctx, x, y, text, len0+1, attr, lattr);
+	    text += len0+1;
+	    len -= len0+1;
+	    a = TATTR_COMBINING;
+	}
+	else if (len-len0 >= 2 && text[len0] == 0xDB40 &&
+	         (text[len0+1] >= 0xDD00 && text[len0+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
+	    attr &= ~TATTR_COMBINING;
+	    do_text_internal(ctx, x, y, text, len0+2, attr, lattr);
+	    text += len0+2;
+	    len -= len0+2;
+	    a = TATTR_COMBINING;
+	}
+	else
 	attr &= ~TATTR_COMBINING;
 	while (len--) {
 	    do_text_internal(ctx, x, y, text, 1, attr | a, lattr);
@@ -4616,6 +4441,11 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    return -1;
 	}
 	if (left_alt && wParam == VK_SPACE && cfg.alt_space) {
+	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
+	    return -1;
+	}
+        // xxxxxxxxxxxxxxxxxxx
+	if (left_alt && wParam == VK_SPACE) {
 	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
 	    return -1;
 	}
@@ -5966,11 +5796,18 @@ void do_beep(void *frontend, int mode)
 void set_iconic(void *frontend, int iconic)
 {
     if (IsIconic(hwnd)) {
-	if (!iconic)
+	if (!iconic) {
 	    ShowWindow(hwnd, SW_RESTORE);
+	    /* Background */
+	    ShowWindow(bg_hwnd, SW_RESTORE);
+	}
     } else {
-	if (iconic)
+	if (iconic) {
+	    /* Background */
+	    ShowWindow(bg_hwnd, SW_MINIMIZE);
+
 	    ShowWindow(hwnd, SW_MINIMIZE);
+	}
     }
 }
 
@@ -5985,6 +5822,9 @@ void move_window(void *frontend, int x, int y)
        return;
 
     SetWindowPos(hwnd, NULL, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+    /* Background */
+    bg_move(1);
 }
 
 /*
@@ -5997,6 +5837,9 @@ void set_zorder(void *frontend, int top)
 	return;			       /* ignore */
     SetWindowPos(hwnd, top ? HWND_TOP : HWND_BOTTOM, 0, 0, 0, 0,
 		 SWP_NOMOVE | SWP_NOSIZE);
+
+    /* Background */
+    bg_order();
 }
 
 /*
@@ -6014,11 +5857,18 @@ void refresh_window(void *frontend)
 void set_zoomed(void *frontend, int zoomed)
 {
     if (IsZoomed(hwnd)) {
-        if (!zoomed)
+        if (!zoomed) {
 	    ShowWindow(hwnd, SW_RESTORE);
+	    /* Background */
+	    ShowWindow(bg_hwnd, SW_RESTORE);
+        }
     } else {
-	if (zoomed)
+	if (zoomed) {
+	    /* Background */
+	    ShowWindow(bg_hwnd, SW_MINIMIZE);
+
 	    ShowWindow(hwnd, SW_MAXIMIZE);
+        }
     }
 }
 
@@ -6179,11 +6029,18 @@ static void clear_full_screen()
 static void flip_full_screen()
 {
     if (is_full_screen()) {
+	/* Background */
+	ShowWindow(bg_hwnd, SW_RESTORE);
+
 	ShowWindow(hwnd, SW_RESTORE);
     } else if (IsZoomed(hwnd)) {
 	make_full_screen();
     } else {
 	SendMessage(hwnd, WM_FULLSCR_ON_MAX, 0, 0);
+
+	/* Background */
+	ShowWindow(bg_hwnd, SW_MAXIMIZE);
+
 	ShowWindow(hwnd, SW_MAXIMIZE);
     }
 }
@@ -6231,8 +6088,8 @@ void agent_schedule_callback(void (*callback)(void *, void *, int),
 
 /* (opt & ETO_CLIPPED) must not be zero. */
 static void
-ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
-	      WCHAR *str, UINT cnt, const int *dx, int wide)
+ExtTextOutW2 (int wide, HDC hdc, int x, int y, UINT opt, const RECT *rc,
+	      WCHAR *str, UINT cnt, const int *dx)
 {
   unsigned int i;
   SIZE s;
@@ -6242,22 +6099,48 @@ ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
   LONG cx2;
   extern int iso2022_win95flag;
 
-  if (!dx) {
-    ExtTextOutW (hdc, x, y, opt, rc, str, cnt, dx);
-    return;
-  }
-
+  if (!dx)
+    {
+      ExtTextOutW (hdc, x, y, opt, rc, str, cnt, dx);
+      return;
+    }
   f = 0;
   rc2 = *rc;
   w95 = wide ? iso2022_win95flag : 0;
   while (cnt)
     {
+      int clen = 1;
+      int dx1 = *dx;
+      int dx2 = 0;
       cx2 = 0;
-      for (i = 0 ; i < cnt ; i++)
+      for (i = 0 ; i < cnt ; i+=clen)
 	{
+          if (i+1<cnt && IS_HIGH_SURROGATE(str[i]) &&
+              IS_LOW_SURROGATE(str[i+1])) {
+	    GetTextExtentPoint32W (hdc, &str[i], 2, &s);
+            clen = 2;
+            dx1 = dx[i+1];
+          }
+          else {
 	  GetTextExtentPoint32W (hdc, &str[i], 1, &s);
-	  if ((s.cx > *dx ||
-	       s.cx * 4 < *dx * 3) != f)
+            clen =1;
+            dx1 = dx[i];
+          }
+          if (cnt-clen >= 1 &&
+              ((str[i+clen] >= 0x180B && str[i+clen] <= 0x180D) ||  /* MONGOLIAN FREE VARIATION SELECTOR */
+               (str[i+clen] >= 0xFE00 && str[i+clen] <= 0xFE0F))) {    /* VARIATION SELECTOR 1-16 */
+              dx1 = dx[i+clen];
+              clen++;
+          }
+          else if (cnt-clen >= 2 &&
+                   str[i+clen] == 0xDB40 &&
+                   (str[i+clen+1] >= 0xDD00 && str[i+clen+1] <= 0xDDEF)) { /* VARIATION SELECTOR 17-256 */
+              dx1 = dx[i+clen+1];
+              clen += 2;
+          }
+
+	  if ((s.cx > dx1 ||
+	       s.cx * 4 < dx1 * 3) != f)
 	    break;
 	  if (f && cx2 != s.cx)
 	    {
@@ -6265,16 +6148,17 @@ ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
 		break;
 	      cx2 = s.cx;
 	    }
+          dx2 += dx1;
 	  if ((w95 && !f) || (0x590 <= str[i] && str[i] <= 0x5ff))
 	    {
-	      i++;
+	      i+=clen;
 	      break;
 	    }
 	}
       if (i)
 	{
 	  cnt -= i;
-	  rc2.right = cnt ? rc2.left + *dx * i : rc->right;
+	  rc2.right = cnt ? rc2.left + dx2 : rc->right;
 	  if (f)
 	    {
 	      HDC dc;
@@ -6286,7 +6170,7 @@ ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
 	      rc3.right = s.cx;
 	      rc3.bottom = s.cy;
 	      dc = CreateCompatibleDC (hdc);
-	      bm = CreateBitmap (max (s.cx, *dx * i),
+	      bm = CreateBitmap (max (s.cx, dx2),
 				 s.cy, 1, 1, 0);
 	      oldbm = SelectObject (dc, bm);
 	      SelectObject (dc, GetCurrentObject (hdc, OBJ_FONT));
@@ -6296,7 +6180,7 @@ ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
 	      SetBkMode (dc, OPAQUE);
 	      ExtTextOutW (dc, 0, 0, ETO_OPAQUE, &rc3, str, i, 0);
 	      SetStretchBltMode (dc, BLACKONWHITE);
-	      StretchBlt (dc, 0, 0, *dx * i, s.cy,
+	      StretchBlt (dc, 0, 0, dx2, s.cy,
 			  dc, 0, 0, s.cx, s.cy, SRCCOPY);
 	      {
 		HDC dc2;
@@ -6322,11 +6206,11 @@ ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
 			  SRCCOPY);
 		SetTextColor (dc2, RGB (0, 0, 0));
 		SetBkColor (dc2, RGB (255, 255, 255));
-		BitBlt (dc2, x - rc2.left, y - rc2.top, *dx * i,
+		BitBlt (dc2, x - rc2.left, y - rc2.top, dx2,
 			s.cy, dc, 0, 0, SRCAND);
 		SetBkColor (dc2, RGB (0, 0, 0));
 		SetTextColor (dc2, GetTextColor (hdc));
-		BitBlt (dc2, x - rc2.left, y - rc2.top, *dx * i,
+		BitBlt (dc2, x - rc2.left, y - rc2.top, dx2,
 			s.cy, dc, 0, 0, SRCPAINT);
 		BitBlt (hdc, rc2.left, rc2.top, rc2.right - rc2.left,
 			rc2.bottom - rc2.top, dc2, 0, 0,
@@ -6341,41 +6225,563 @@ ExtTextOutW2 (HDC hdc, int x, int y, UINT opt, const RECT *rc,
 	    }
 	  else
 	    ExtTextOutW (hdc, x, y, opt, &rc2, str, i, dx);
-	  x += *dx * i;
+	  x += dx2;
 	  str += i;
+          dx += i;
+          dx2 = 0;
 	  rc2.left = rc2.right;
 	}
       f = !f;
     }
 }
 
-static void
-extend_glass_frame(HWND hwnd)
-{
-    BOOL bEnabled = FALSE;
-    HRESULT (WINAPI *pDwmIsCompositionEnabled)(BOOL*) = NULL;
-    HRESULT (WINAPI *pDwmExtendFrameIntoClientArea)(HWND, MARGINS*) = NULL;
-    HMODULE hmDwmapi = NULL;
+/* Background */
+/* Transparency */
 
-    if (osVersion.dwMajorVersion < 6) {
+static void bg_init()
+{
+    int i, j;
+
+    for (i = 0; i < 4; i++) {
+	for (j = 0; j < 2; j++) {
+	    if (cfg.alphas_pc[i][j] > 100) {
+		cfg.alphas_pc[i][j] = 100;
+	    }
+	    if (cfg.alphas_pc[i][j] < 0) {
+		cfg.alphas_pc[i][j] = 0;
+	    }
+	    alphas[i][j] = cfg.alphas_pc[i][j] * 255 / 100;
+	    if ((alphas[i][j] == 0) && (cfg.bg_effect == BG_PLANE)) {
+		alphas[i][j] = 1;
+	    }
+	}
+    }
+
+    /* terrible hack to avoid focus lost on title bar */ 
+    if ((cfg.bg_wallpaper == BG_NONE) &&
+	(cfg.bg_effect == BG_PLANE) &&
+	(alphas[ALPHA_DEFAULT_BG][BG_ACTIVE] == 255) &&
+	(alphas[ALPHA_DEFAULT_BG][BG_INACTIVE] == 255)) {
+    } else {
+	int r = GetRValue(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
+	int g = GetGValue(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
+	int b = GetBValue(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
+	if ((r == g) && (r == b)) {
+	    if (r) {
+		colours[(ATTR_DEFBG>>ATTR_BGSHIFT)] -= 1;
+	    } else {
+		colours[(ATTR_DEFBG>>ATTR_BGSHIFT)] += 1;
+	    }
+	}
+    }
+
+    /*  aero functions */
+    if (!p_DwmIsCompositionEnabled && (osVersion.dwMajorVersion > 5)) {
+	HMODULE hmLib = NULL;
+	hmLib = load_system32_dll("Dwmapi.dll");
+	if (hmLib) {
+	    GET_WINDOWS_FUNCTION(hmLib, DwmIsCompositionEnabled);
+	    GET_WINDOWS_FUNCTION(hmLib, DwmExtendFrameIntoClientArea);
+	    GET_WINDOWS_FUNCTION(hmLib, DwmEnableBlurBehindWindow);
+	}
+	hmLib = load_system32_dll("UxTheme.dll");
+	if (hmLib) {
+	    GET_WINDOWS_FUNCTION(hmLib, EndBufferedPaint);
+	    GET_WINDOWS_FUNCTION(hmLib, BeginBufferedPaint);
+	    GET_WINDOWS_FUNCTION(hmLib, BufferedPaintSetAlpha);
+	}
+    }
+}
+
+static void bg_create()
+{
+    const char *const bgname = "PuTTYbg";
+
+    RECT rc;
+    POINT po = {0, 0};
+    BYTE a;
+    WNDCLASSEX wc;
+
+    if (bg_hwnd) {
+	DestroyWindow(bg_hwnd);
+	bg_hwnd = NULL;
+	UnregisterClass(bgname, hinst);
+    }
+
+    if ((cfg.bg_wallpaper == BG_NONE) &&
+	(cfg.bg_effect == BG_PLANE) &&
+	(alphas[ALPHA_DEFAULT_BG][BG_ACTIVE] == 255) &&
+	(alphas[ALPHA_DEFAULT_BG][BG_INACTIVE] == 255)) {
+	SetWindowLongPtr(hwnd, GWL_EXSTYLE,
+			 GetWindowLongPtr(hwnd, GWL_EXSTYLE) & ~WS_EX_LAYERED);
 	return;
     }
 
-    hmDwmapi = load_system32_dll("dwmapi.dll");
+    wc.cbClsExtra = 0;
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.cbWndExtra = 0;
+    wc.hbrBackground = NULL;
+    wc.hCursor = LoadCursor(NULL, IDC_IBEAM);
+    wc.hIcon = NULL;
+    wc.hIconSm = NULL;
+    wc.hInstance = hinst;
+    wc.lpfnWndProc = (WNDPROC)bg_WndProc;
+    wc.lpszClassName = bgname;
+    wc.lpszMenuName = NULL;
+    wc.style = 0;
 
-    if (hmDwmapi) {
-	pDwmIsCompositionEnabled =
-	    GetProcAddress(hmDwmapi, "DwmIsCompositionEnabled");
-	pDwmExtendFrameIntoClientArea =
-	    GetProcAddress(hmDwmapi, "DwmExtendFrameIntoClientArea");
+    RegisterClassEx(&wc);
+
+    bg_hwnd = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE |
+			     WS_EX_LAYERED,
+			     bgname, "",
+			     WS_POPUP,
+			     0, 0, 0, 0,
+			     NULL, NULL, hinst, NULL);
+
+    /*  position */
+    GetClientRect(hwnd, &rc);
+    ClientToScreen(hwnd, &po);
+    SetWindowPos(bg_hwnd, hwnd, 
+		 po.x, po.y, rc.right - rc.left, rc.bottom - rc.top,
+		 SWP_NOACTIVATE);
+
+    /*  color */
+    if (bg_br) {
+	DeleteObject(bg_br);
     }
-    if (pDwmIsCompositionEnabled) {
-	pDwmIsCompositionEnabled(&bEnabled);
-    }
-    if (bEnabled && pDwmExtendFrameIntoClientArea) {
-	MARGINS margins = {-1, 0, 0, 0};
-	pDwmExtendFrameIntoClientArea(hwnd, &margins);
+    bg_br = CreateSolidBrush(colours[(ATTR_DEFBG>>ATTR_BGSHIFT)]);
+    SetClassLongPtr(bg_hwnd, GCLP_HBRBACKGROUND, (LONG)bg_br);
+
+    /*  background, wallpaper */
+    bm_create();
+    wp_create();
+
+    /*  aero glass */
+    bg_glass();
+
+    /*  transparent */
+    SetWindowLongPtr(hwnd, GWL_EXSTYLE,
+		     GetWindowLongPtr(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+    SetLayeredWindowAttributes(hwnd,
+			       colours[(ATTR_DEFBG >> ATTR_BGSHIFT)], 0,
+			       LWA_COLORKEY);
+    /*     a = alphas[ALPHA_WINDOW][BG_ACTIVE]; */
+    /*     SetLayeredWindowAttributes(hwnd, 0, a, LWA_ALPHA); */
+    a = ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) ?
+	255 : alphas[ALPHA_DEFAULT_BG][BG_ACTIVE];
+    SetLayeredWindowAttributes(bg_hwnd, 0, a, LWA_ALPHA);
+
+    /*  show */
+    ShowWindow(bg_hwnd, SW_SHOWNOACTIVATE);
+    InvalidateRect(bg_hwnd, NULL, TRUE);
+    InvalidateRect(hwnd, NULL, TRUE);
+    /*  UpdateWindow(bg_hwnd); */
+    /*  UpdateWindow(hwnd); */
+}
+
+static void bm_create()
+{
+    static HBITMAP bm_bm = NULL;
+    static HBITMAP bm_bm_old = NULL;
+
+    BITMAP bm;
+
+    if (bm_bm != NULL) {
+	if (bm_dc != NULL) {
+	    SelectObject(bm_dc, bm_bm_old);
+	    DeleteDC(bm_dc);
+	    bm_dc = NULL;
+	}
+	DeleteObject(bm_bm);
+	bm_bm = NULL;
     }
 
-    FreeLibrary(hmDwmapi);
+    if ((cfg.bg_wallpaper == BG_NONE) | (cfg.bg_wallpaper == BG_DESKTOP)) {
+	return;
+    }
+    if (cfg.wp_file.path == NULL || strlen(cfg.wp_file.path) == 0) {
+	return;
+    }
+
+    bm_bm = LoadImage(NULL, cfg.wp_file.path, IMAGE_BITMAP, 0, 0,
+		      LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+    if (bm_bm == NULL) {
+	return;
+    }
+
+    GetObject(bm_bm, sizeof(BITMAP), &bm);
+    bm_width=bm.bmWidth;
+    bm_height=bm.bmHeight;
+
+    bm_dc = CreateCompatibleDC(GetDC(bg_hwnd));
+    bm_bm_old = SelectObject(bm_dc, bm_bm);
+
+    return;
+}
+
+
+static void wp_create()
+{
+    static HBITMAP wp_bm = NULL;
+    static HBITMAP wp_bm_old = NULL;
+
+    int win_width = 0;
+    int win_height = 0;
+    int stretch_width = 0;
+    int stretch_height = 0;
+    int offset_x = 0;
+    int offset_y = 0;
+
+    int stretch = 0;
+    HRGN hrgn = NULL;
+    RECT rc;
+
+    HPALETTE hpal = NULL;
+    HPALETTE hpal_old;
+
+    enum {
+	STRETCH_NONE, STRETCH_WIDTH, STRETCH_HEIGHT, STRETCH_BOTH
+    };
+
+    if (wp_bm != NULL) {
+	if (wp_dc != NULL) {
+	    SelectObject(wp_dc, wp_bm_old);
+	    DeleteDC(wp_dc);
+	    wp_dc = NULL;
+	}
+	DeleteObject(wp_bm);
+	wp_bm = NULL;
+    }
+
+    if (bm_dc == NULL) {
+	return;
+    }
+
+    if (cfg.bg_wallpaper == BG_FILE) {
+	GetClientRect(hwnd, &rc);
+	win_width = rc.right - rc.left;
+	win_height = rc.bottom - rc.top;
+    } else if (cfg.bg_wallpaper == BG_FILE_DESKTOP) {
+	win_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+	win_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+	rc.left = 0;
+	rc.top = 0;
+	rc.right = win_width;
+	rc.bottom = win_height;
+    } else {
+	return;
+    }
+
+    wp_dc = CreateCompatibleDC(GetDC(bg_hwnd));
+    wp_bm = CreateCompatibleBitmap(GetDC(bg_hwnd), win_width, win_height);
+    wp_bm_old = SelectObject(wp_dc, wp_bm);
+
+    SetStretchBltMode(wp_dc, HALFTONE);
+    hpal = CreateHalftonePalette(wp_dc);
+    hpal_old = SelectPalette(wp_dc, hpal, FALSE);
+    RealizePalette(wp_dc);
+
+    FillRect(wp_dc, &rc, bg_br);
+
+    switch (cfg.wp_position) {
+    case WP_FILL:
+	stretch = ((win_width * bm_height) > (win_height * bm_width)) ?
+	    STRETCH_WIDTH : STRETCH_HEIGHT;
+	break;
+    case WP_FIT:
+	stretch = ((win_width * bm_height) > (win_height * bm_width)) ?
+	    STRETCH_HEIGHT : STRETCH_WIDTH;
+	break;
+    case WP_STRETCH:
+	stretch = STRETCH_BOTH;
+	break;
+    case WP_TILE:
+    case WP_FIX:
+	stretch = STRETCH_NONE;
+	break;
+    }
+
+    switch (stretch) {
+    case STRETCH_NONE:
+	offset_x =
+	    (cfg.wp_align == WP_LEFT) ? 0 :
+	(cfg.wp_align == WP_CENTER) ? (win_width - bm_width) / 2 :
+	(cfg.wp_align == WP_RIGHT) ? win_width - bm_width : 0;
+	offset_y =
+	    (cfg.wp_valign == WP_TOP) ? 0 :
+	    (cfg.wp_valign == WP_MIDDLE) ? (win_height - bm_height) / 2:
+	    (cfg.wp_valign == WP_BOTTOM) ? win_height - bm_height : 0;
+	if (cfg.wp_position == WP_TILE) {
+	    int m = offset_x % bm_width;
+	    int n = offset_y % bm_height;
+	    int y = n ? n - bm_height : 0;
+	    for (; y <= win_height - n ; y += bm_height) {
+		int x = m ? m - bm_width : 0;
+		for (; x <= win_width - m ; x += bm_width) {
+		    BitBlt(wp_dc, x, y, bm_width, bm_height,
+			   bm_dc, 0, 0, SRCCOPY);
+		}
+	    }
+	} else {
+	    hrgn = CreateRectRgn(offset_x, offset_y,
+				 offset_x + bm_width, offset_y + bm_height);
+	    SelectClipRgn(wp_dc, hrgn);
+	    BitBlt(wp_dc, offset_x , offset_y, win_width, win_height,
+		   bm_dc, 0, 0, SRCCOPY);
+	}
+	break;
+    case STRETCH_WIDTH:
+	stretch_width = win_width;
+	stretch_height = bm_height * win_width / bm_width;;
+	offset_x = 0;
+	offset_y =
+	    (cfg.wp_valign == WP_TOP) ? 0 :
+	    (cfg.wp_valign == WP_MIDDLE) ? (win_height - stretch_height) / 2:
+	    (cfg.wp_valign == WP_BOTTOM) ? win_height - stretch_height : 0;
+	if (stretch_height < win_height) {
+	    hrgn = CreateRectRgn(offset_x, offset_y,
+				 offset_x + stretch_width,
+				 offset_y + stretch_height);
+	    SelectClipRgn(wp_dc, hrgn);
+	}
+	StretchBlt(wp_dc, offset_x, offset_y, stretch_width, stretch_height,
+		   bm_dc, 0, 0, bm_width, bm_height, SRCCOPY);
+	break;
+    case STRETCH_HEIGHT:
+	stretch_width = bm_width * win_height / bm_height;;
+	stretch_height = win_height;
+	offset_x =
+	    (cfg.wp_align == WP_LEFT) ? 0 :
+	    (cfg.wp_align == WP_CENTER) ? (win_width - stretch_width) / 2 :
+	    (cfg.wp_align == WP_RIGHT) ? win_width - stretch_width : 0;
+	offset_y = 0;
+	if (stretch_width < win_width) {
+	    hrgn = CreateRectRgn(offset_x, offset_y,
+				 offset_x + stretch_width,
+				 offset_y + stretch_height);
+	    SelectClipRgn(wp_dc, hrgn);
+	}
+	StretchBlt(wp_dc, offset_x, offset_y, stretch_width, stretch_height,
+		   bm_dc, 0, 0, bm_width, bm_height, SRCCOPY);
+	break;
+    case STRETCH_BOTH:
+	StretchBlt(wp_dc, 0, 0, win_width, win_height,
+		   bm_dc, 0, 0, bm_width, bm_height, SRCCOPY);
+	break;
+    }
+
+    if (hpal) {
+	SelectPalette(wp_dc, hpal_old, FALSE);
+	DeleteObject(hpal);
+	hpal = NULL;
+    }
+
+    if (hrgn) {
+	SelectClipRgn(wp_dc, NULL);
+	DeleteObject(hrgn);
+	hrgn = NULL;
+    }
+
+    return;
+}
+
+static void wp_draw(HDC hdc, RECT *rc) {
+    HRGN rectrgn;
+    POINT po;
+    BOOL r;
+
+    switch (cfg.bg_wallpaper) {
+    case BG_NONE:
+	if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
+	    FillRect(hdc, rc, bg_br);
+	}
+	break;
+    case BG_FILE:
+	r = BitBlt(hdc, rc->left, rc->top,
+		   rc->right - rc->left, rc->bottom - rc->top,
+		   wp_dc, rc->left, rc->top, SRCCOPY);
+	break;
+    case BG_FILE_DESKTOP:
+	po.x = rc->left;
+	po.y = rc->top;
+	ClientToScreen(bg_hwnd, &po);
+	BitBlt(hdc, rc->left, rc->top,
+	       rc->right - rc->left, rc->bottom - rc->top,
+	       wp_dc, po.x, po.y, SRCCOPY);
+	break;
+    case BG_DESKTOP:
+	rectrgn = CreateRectRgnIndirect(rc);
+	SelectClipRgn(hdc, rectrgn);
+	PaintDesktop(hdc);
+	SelectClipRgn(hdc, NULL);
+	DeleteObject(rectrgn);
+	break;
+    }
+}
+
+static LRESULT CALLBACK bg_WndProc(HWND bg_hwnd, UINT message,
+				   WPARAM wParam, LPARAM lParam)
+{
+    POINT cursorpos;
+
+    switch (message) {
+    case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONUP:
+	SetForegroundWindow(hwnd);
+	cursorpos.x = X_POS(lParam);
+	cursorpos.y = Y_POS(lParam);
+	ClientToScreen(bg_hwnd, &cursorpos);
+	ScreenToClient(hwnd, &cursorpos);
+	ReleaseCapture();
+	SendMessage(hwnd, message, wParam, MAKELPARAM(cursorpos.x, cursorpos.y));
+	return 0;
+    case WM_MOUSEACTIVATE:
+	return MA_NOACTIVATE;
+    case WM_PAINT: {
+	PAINTSTRUCT p;
+	HDC hdc;
+	hdc = BeginPaint(bg_hwnd, &p);
+
+	if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
+	    HPAINTBUFFER hpb = NULL;
+	    HDC phdc;
+	    BP_PAINTPARAMS pp = {sizeof(pp)};
+
+	    pp.dwFlags = BPPF_ERASE;
+	    hpb = p_BeginBufferedPaint(p.hdc, &p.rcPaint, BPBF_TOPDOWNDIB, &pp, &phdc);
+	    if (hpb && phdc) {
+		wp_draw(phdc, &p.rcPaint);
+		p_BufferedPaintSetAlpha(hpb, NULL,
+					alphas[ALPHA_DEFAULT_BG][bg_active]);
+		p_EndBufferedPaint(hpb, TRUE);
+	    }
+
+	    DeleteDC(phdc);
+	} else {
+	    wp_draw(hdc, &p.rcPaint);
+	}
+
+	EndPaint(bg_hwnd, &p);
+	return 0;
+    }
+    case WM_SIZE:
+	/*	 AnimateWindow(bg_hwnd, 1000, AW_SLIDE); */
+	/*       ShowWindow(bg_hwnd, SW_HIDE); */
+	break;
+    case WM_ERASEBKGND:
+	if ((cfg.bg_wallpaper == BG_FILE_DESKTOP) ||
+	    (cfg.bg_wallpaper == BG_DESKTOP)) {
+	  return FALSE;
+	}
+	break;
+    default:
+	break;
+    }
+
+    return DefWindowProc(bg_hwnd, message, wParam, lParam);
+}
+
+
+static void bg_resize(int draw)
+{
+    RECT rc;
+    POINT po = {0, 0};
+
+    if (!bg_hwnd) {
+	return;
+    }
+
+    GetClientRect(hwnd, &rc);
+    ClientToScreen(hwnd, &po);
+    SetWindowPos(bg_hwnd, hwnd, 
+		 po.x, po.y, rc.right - rc.left, rc.bottom - rc.top,
+		 SWP_NOACTIVATE);
+
+    if (draw) {
+	wp_create();
+	InvalidateRect(bg_hwnd, NULL, FALSE);
+    }
+}
+
+
+static void bg_move(int draw)
+{
+    POINT po = {0, 0};
+
+    if (!bg_hwnd) {
+	return;
+    }
+
+    ClientToScreen(hwnd, &po);
+    SetWindowPos(bg_hwnd, hwnd, 
+		 po.x, po.y, 0, 0,
+		 SWP_NOSIZE | SWP_NOACTIVATE);
+
+    if ((draw || cfg.wp_moving) &&
+	((cfg.bg_wallpaper == BG_FILE_DESKTOP) ||
+	 (cfg.bg_wallpaper == BG_DESKTOP))) {
+	InvalidateRect(bg_hwnd, NULL, FALSE);
+    }
+}
+
+
+static void bg_order()
+{
+    if (!bg_hwnd) {
+	return;
+    }
+
+    SetWindowPos(bg_hwnd, hwnd, 0, 0, 0, 0,
+		 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+
+static void bg_glass()
+{
+    DWM_BLURBEHIND bb = {DWM_BB_ENABLE, FALSE};
+    MARGINS margins = {0};
+
+    BOOL bEnabled = FALSE;
+
+    if (p_DwmIsCompositionEnabled) {
+	p_DwmIsCompositionEnabled(&bEnabled);
+    }
+    if (!bEnabled) {
+	return;
+    }
+
+    if (cfg.bg_effect == BG_DOUBLE_GLASS) {
+	margins.cxLeftWidth = -1;
+    }
+    p_DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+    if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
+	bb.fEnable = TRUE;
+    }
+    p_DwmEnableBlurBehindWindow(bg_hwnd, &bb);
+}
+
+
+static void bg_trans()
+{
+    if (!bg_hwnd) {
+	return;
+    }
+
+    if (alphas[ALPHA_DEFAULT_BG][BG_ACTIVE] ==
+	alphas[ALPHA_DEFAULT_BG][BG_INACTIVE]) {
+	return;
+    }
+    if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
+	InvalidateRect(bg_hwnd, NULL, FALSE);
+    } else {
+	SetLayeredWindowAttributes(bg_hwnd, 0,
+				   alphas[ALPHA_DEFAULT_BG][bg_active],
+				   LWA_ALPHA);
+    }
 }

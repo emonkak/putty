@@ -361,52 +361,83 @@ void win_setup_config_box(struct controlbox *b, HWND *hwndp, int has_help,
 		  HELPCTX(no_help),
 		  dlg_stdcheckbox_handler, I(offsetof(Config,ctrl_tab_switch)));
 
-    /*
-     * HACK: PuttyTray / Reconnect
-     */
+    /* HACK: PuttyTray / Reconnect */
     s = ctrl_getset(b, "Connection", "reconnect", "Reconnect options");
     ctrl_checkbox(s, "Attempt to reconnect on system wakeup", 'w', HELPCTX(no_help), dlg_stdcheckbox_handler, I(offsetof(Config,wakeup_reconnect)));
     ctrl_checkbox(s, "Attempt to reconnect on connection failure", 'f', HELPCTX(no_help), dlg_stdcheckbox_handler, I(offsetof(Config,failure_reconnect)));
 
-	/* > transparent background patch */
-    /*
-     * The Window/Wallpaper panel.
-     */
-    ctrl_settitle(b, "Window/Wallpaper", "Options controlling wallpaper");
+    /* Background */
+    ctrl_settitle(b, "Window/Background", "Options controlling background");
+    s = ctrl_getset(b, "Window/Background", "background", "Background");
+    ctrl_radiobuttons(s, "Effect:", 'e', 4,
+                      HELPCTX(no_help),
+                      dlg_stdradiobutton_handler,
+                      I(offsetof(Config, bg_effect)),
+                      "Plane", I(0),
+                      "Glass", I(1),
+                      "Double Glass", I(2),
+                      NULL);
+    ctrl_radiobuttons(s, "Wallpaper:", 'x', 2,
+                      HELPCTX(no_help),
+                      dlg_stdradiobutton_handler,
+                      I(offsetof(Config, bg_wallpaper)),
+                      "None", I(0),
+                      "Bitmap file", I(1),
+                      "Bitmap file on Desktop", I(2),
+                      "Desktop", I(3),
+                      NULL);
 
-	s = ctrl_getset( b, "Window/Wallpaper", "wallpaper",
-					 "Transparent background mode" );
-    ctrl_radiobuttons( s, NULL, NO_SHORTCUT, 1,
-					   HELPCTX(no_help),
-					   dlg_stdradiobutton_handler,
-					   I(offsetof(Config, transparent_mode)),
-					   "Disable", 'd', I(0),
-					   "Like transparent xterms", 'x', I(1),
-					   "Use bitmap file", 'b', I(2),
-					   "Glass", 'v', I(4),
-					   NULL );
+    s = ctrl_getset(b, "Window/Background", "wallpaper", "Wallpaper");
+    ctrl_filesel(s, "Bitmap file:", NO_SHORTCUT,
+                 FILTER_IMAGE_FILES,
+                 FALSE, "Select bitmap file for background",
+                 HELPCTX(no_help),
+                 dlg_stdfilesel_handler, I(offsetof(Config,wp_file)) );
+    ctrl_checkbox(s, "Draw while moving/resizing", 'n',
+                  HELPCTX(no_help),
+                  dlg_stdcheckbox_handler,
+                  I(offsetof(Config, wp_moving)));
+    ctrl_radiobuttons(s, "Position:", 'p', 3,
+                      HELPCTX(no_help),
+                      dlg_stdradiobutton_handler,
+                      I(offsetof(Config, wp_position)),
+                      "Fill", I(0),
+                      "Fit", I(1),
+                      "Stretch", I(2),
+                      "Tile", I(3),
+                      "Center", I(4),
+                      NULL);
+    ctrl_radiobuttons(s, "Horizontal Align:", 'h', 3,
+                      HELPCTX(no_help),
+                      dlg_stdradiobutton_handler,
+                      I(offsetof(Config, wp_align)),
+                      "Left", I(0),
+                      "Center", I(1),
+                      "Right", I(2),
+                      NULL);
+    ctrl_radiobuttons(s, "Vertical Align:", 'v', 3,
+                      HELPCTX(no_help),
+                      dlg_stdradiobutton_handler,
+                      I(offsetof(Config, wp_valign)),
+                      "Top", I(0),
+                      "Middle", I(1),
+                      "Bottom", I(2),
+                      NULL);
 
-	s = ctrl_getset( b, "Window/Wallpaper", "shading",
-					 "Adjust transparency" );
-	ctrl_editbox( s, "Alpha value of bg image (0 - 255) :", 'l', 20,
-				  HELPCTX(no_help),
-				  dlg_stdeditbox_handler, I(offsetof(Config,shading)), I(-1) );
-
-	s = ctrl_getset( b, "Window/Wallpaper", "imgfile",
-					 "Use bitmap file mode settings" );
-	ctrl_checkbox( s, "Use AlphaBlending", 'u',
-				   HELPCTX(no_help),
-				   dlg_stdcheckbox_handler, I(offsetof(Config,use_alphablend)) );
-	ctrl_checkbox( s, "Stopped to draw when moving", 's',
-				   HELPCTX(no_help),
-				   dlg_stdcheckbox_handler, I(offsetof(Config,stop_when_moving)) );
-	ctrl_filesel( s, "Bitmap file used for background :", NO_SHORTCUT,
-				  FILTER_IMAGE_FILES,
-				  FALSE, "Select bitmap file for background",
-				  HELPCTX(no_help),
-				  dlg_stdfilesel_handler, I(offsetof(Config,bgimg_file)) );
-
-	/* < */
+    /* Transparency */
+    ctrl_settitle(b, "Window/Transparency", "Options controlling transparency");
+    s = ctrl_getset(b, "Window/Transparency", "alpha",
+                    "Default Background Alpha Value 0-100");
+    ctrl_editbox(s, "Active Window", NO_SHORTCUT, 20,
+                 HELPCTX(no_help),
+                 dlg_stdeditbox_handler,
+                 I(offsetof(Config, alphas_pc[ALPHA_DEFAULT_BG][BG_ACTIVE])),
+                 I(-1));
+    ctrl_editbox(s, "Inactive Window", NO_SHORTCUT, 20,
+                 HELPCTX(no_help),
+                 dlg_stdeditbox_handler,
+                 I(offsetof(Config, alphas_pc[ALPHA_DEFAULT_BG][BG_INACTIVE])),
+                 I(-1));
 
     /*
      * The icon for Windows title bar

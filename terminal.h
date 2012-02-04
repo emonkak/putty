@@ -274,6 +274,8 @@ struct terminal_tag {
     struct bidi_cache_entry *pre_bidi_cache, *post_bidi_cache;
     int bidi_cache_size;
 
+    int bracketed_paste;
+
     unsigned long ignore_uchars[IGNORE_CHARS_MAX + 1];
     int ignore_length;
 };

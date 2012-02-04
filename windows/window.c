@@ -28,14 +28,8 @@
 #include <commctrl.h>
 #include <richedit.h>
 #include <mmsystem.h>
+#include <dwmapi.h>
 #ifdef __MINGW32__
-#include <uxtheme.h>
-
-#define WM_DWMCOMPOSITIONCHANGED        0x031E
-#define WM_DWMNCRENDERINGCHANGED        0x031F
-#define WM_DWMCOLORIZATIONCOLORCHANGED  0x0320
-#define WM_DWMWINDOWMAXIMIZEDCHANGE     0x0321
-
 #define IMR_COMPOSITIONWINDOW           0x0001
 #define IMR_CANDIDATEWINDOW             0x0002
 #define IMR_COMPOSITIONFONT             0x0003
@@ -43,8 +37,6 @@
 #define IMR_CONFIRMRECONVERTSTRING      0x0005
 #define IMR_QUERYCHARPOSITION           0x0006
 #define IMR_DOCUMENTFEED                0x0007
-#else
-#include <dwmapi.h>
 #endif
 
 

@@ -4444,11 +4444,6 @@ static int TranslateKey(UINT message, WPARAM wParam, LPARAM lParam,
 	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
 	    return -1;
 	}
-        // xxxxxxxxxxxxxxxxxxx
-	if (left_alt && wParam == VK_SPACE) {
-	    SendMessage(hwnd, WM_SYSCOMMAND, SC_KEYMENU, 0);
-	    return -1;
-	}
 	if (left_alt && wParam == VK_RETURN && cfg.fullscreenonaltenter &&
 	    (cfg.resize_action != RESIZE_DISABLED)) {
  	    if ((HIWORD(lParam) & (KF_UP | KF_REPEAT)) != KF_REPEAT)
@@ -6647,7 +6642,8 @@ static LRESULT CALLBACK bg_WndProc(HWND bg_hwnd, UINT message,
 	HDC hdc;
 	hdc = BeginPaint(bg_hwnd, &p);
 
-	if ((cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
+	if (p_BeginBufferedPaint &&
+            (cfg.bg_effect == BG_GLASS) || (cfg.bg_effect == BG_DOUBLE_GLASS)) {
 	    HPAINTBUFFER hpb = NULL;
 	    HDC phdc;
 	    BP_PAINTPARAMS pp = {sizeof(pp)};

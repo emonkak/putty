@@ -487,7 +487,7 @@ enum {
 
 /* Background */
 typedef enum {
-    ALPHA_FG, ALPHA_BG, ALPHA_DEFAULT_BG, ALPHA_WINDOW
+    ALPHA_CURSOR, ALPHA_DEFAULT_FG, ALPHA_DEFAULT_BG, ALPHA_BG
 };
 
 typedef enum {
